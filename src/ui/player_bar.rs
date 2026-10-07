@@ -461,11 +461,15 @@ fn now_playing_block(app: &mut App, ui: &mut egui::Ui, region: Rect, now: Option
         }
     }
     if offer_expand && (cover_response.hovered() || over_expand) {
-        let expand = ui.interact(
-            expand_rect,
-            egui::Id::new("now-playing-art-expand"),
-            Sense::click(),
-        );
+        // A button with the usual arrow, not the draggable cover under it:
+        // on Windows the cover's grab cursor is the four-way move arrow.
+        let expand = ui
+            .interact(
+                expand_rect,
+                egui::Id::new("now-playing-art-expand"),
+                Sense::click(),
+            )
+            .on_hover_cursor(egui::CursorIcon::Default);
         ui.painter()
             .circle_filled(expand_rect.center(), 9.0, palette.panel.gamma_multiply(0.9));
         Icon::ChevronUp.image(palette.text, 12.0).paint_at(
