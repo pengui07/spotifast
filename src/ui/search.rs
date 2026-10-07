@@ -279,7 +279,9 @@ fn recent_row(app: &mut App, ui: &mut egui::Ui, entry: &RecentSearch, width: f32
 fn all(app: &mut App, ui: &mut egui::Ui, results: &SearchResults) {
     let palette = app.palette;
     let locale = app.locale;
-    let top = top_pick(results, &app.search.committed);
+    let top = top_pick(results, &app.search.committed, |uri| {
+        app.is_saved(uri) == Some(true)
+    });
     let wide = ui.available_width() > 720.0;
     ui.horizontal_top(|ui| {
         ui.spacing_mut().item_spacing.x = 24.0;
@@ -444,50 +446,77 @@ fn search_key(text: &str) -> String {
         .collect()
 }
 
+/// How far down each kind's list a result from the listener's library can
+/// still become the Top result; Spotify already ranks each list.
+const LIBRARY_REACH: usize = 5;
+
 /// Spotify answers each kind in its own list, with no best match across
-/// them, so the Top result is chosen here. A name that is exactly what was
-/// searched wins, an artist before an album before a song, as Spotify
-/// ranks them; otherwise the first song, or the first of whatever came back.
-fn top_pick<'a>(results: &'a SearchResults, query: &str) -> Option<Top<'a>> {
-    fn items<T>(page: &Option<crate::api::models::Page<T>>) -> &[T] {
-        page.as_ref().map_or(&[], |page| page.items.as_slice())
-    }
+/// them, so the Top result is chosen here, the way Spotify's own app ranks:
+/// something already in the listener's library near the top of its list,
+/// else a name that is exactly what was searched, else the first song. Ties
+/// go to an artist, then an album, a song, a playlist, a podcast.
+fn top_pick<'a>(
+    results: &'a SearchResults,
+    query: &str,
+    saved: impl Fn(&str) -> bool,
+) -> Option<Top<'a>> {
     let key = search_key(query);
-    let named = |name: &str| !key.is_empty() && search_key(name) == key;
-    let exact = items(&results.artists)
-        .iter()
-        .find(|artist| named(&artist.name))
+    let exact = |name: &str| !key.is_empty() && search_key(name) == key;
+    first_top(results, LIBRARY_REACH, |uri, _| saved(uri))
+        .or_else(|| first_top(results, usize::MAX, |_, name| exact(name)))
+        .or_else(|| fallback_top(results))
+}
+
+/// The first result, kind by kind, among each list's first `reach`, that
+/// `hit` accepts by URI and name.
+fn first_top<'a>(
+    results: &'a SearchResults,
+    reach: usize,
+    hit: impl Fn(&str, &str) -> bool,
+) -> Option<Top<'a>> {
+    fn items<T>(
+        page: &Option<crate::api::models::Page<T>>,
+        reach: usize,
+    ) -> impl Iterator<Item = &T> {
+        page.as_ref()
+            .map_or(&[][..], |page| page.items.as_slice())
+            .iter()
+            .take(reach)
+    }
+    items(&results.artists, reach)
+        .find(|artist| hit(&artist.uri, &artist.name))
         .map(Top::Artist)
         .or_else(|| {
-            items(&results.albums)
-                .iter()
-                .find(|album| named(&album.name))
+            items(&results.albums, reach)
+                .find(|album| hit(&album.uri, &album.name))
                 .map(Top::Album)
         })
         .or_else(|| {
-            items(&results.tracks)
-                .iter()
-                .find(|track| named(&track.name))
+            items(&results.tracks, reach)
+                .find(|track| hit(&track.uri, &track.name))
                 .map(Top::Song)
         })
         .or_else(|| {
-            items(&results.playlists)
-                .iter()
-                .find(|playlist| named(&playlist.name))
+            items(&results.playlists, reach)
+                .find(|playlist| hit(&playlist.uri, &playlist.name))
                 .map(Top::Playlist)
         })
         .or_else(|| {
-            items(&results.shows)
-                .iter()
-                .find(|show| named(&show.name))
+            items(&results.shows, reach)
+                .find(|show| hit(&show.uri, &show.name))
                 .map(Top::Podcast)
-        });
-    exact
-        .or_else(|| items(&results.tracks).first().map(Top::Song))
-        .or_else(|| items(&results.artists).first().map(Top::Artist))
-        .or_else(|| items(&results.albums).first().map(Top::Album))
-        .or_else(|| items(&results.playlists).first().map(Top::Playlist))
-        .or_else(|| items(&results.shows).first().map(Top::Podcast))
+        })
+}
+
+/// With nothing saved or named as searched: the first song, or else the
+/// first of whatever came back.
+fn fallback_top(results: &SearchResults) -> Option<Top<'_>> {
+    results
+        .tracks
+        .as_ref()
+        .and_then(|page| page.items.first())
+        .map(Top::Song)
+        .or_else(|| first_top(results, 1, |_, _| true))
 }
 
 enum TopResultSubtitle<'a> {
@@ -972,6 +1001,7 @@ mod tests {
                     },
                     Album {
                         name: "Keep It Like a Secret".into(),
+                        uri: "spotify:album:secret".into(),
                         ..Album::default()
                     },
                 ],
@@ -995,21 +1025,40 @@ mod tests {
     fn a_result_named_as_searched_is_the_top_result_whatever_its_kind() {
         let results = results();
         assert_eq!(
-            name(top_pick(&results, "keep it like a secret")),
+            name(top_pick(&results, "keep it like a secret", |_| false)),
             "Keep It Like a Secret"
         );
         assert_eq!(
-            name(top_pick(&results, "Built To Spill!")),
+            name(top_pick(&results, "Built To Spill!", |_| false)),
             "Built to Spill"
         );
-        assert_eq!(name(top_pick(&results, "carry the zero")), "Carry the Zero");
+        assert_eq!(
+            name(top_pick(&results, "carry the zero", |_| false)),
+            "Carry the Zero"
+        );
+    }
+
+    /// Spotify's own app puts what the listener saved first: "fire" finds
+    /// a saved album called Firewater before an artist called Fire.
+    #[test]
+    fn a_saved_result_near_the_top_of_its_list_wins_over_a_matching_name() {
+        let results = results();
+        let saved = |uri: &str| uri == "spotify:album:secret";
+        assert_eq!(
+            name(top_pick(&results, "keepsecrets", saved)),
+            "Keep It Like a Secret"
+        );
+        assert_eq!(
+            name(top_pick(&results, "keepsecrets", |_| false)),
+            "keepsecrets"
+        );
     }
 
     #[test]
     fn without_a_matching_name_the_first_song_is_the_top_result() {
         let mut results = results();
-        assert_eq!(name(top_pick(&results, "keep")), "Broken Chairs");
+        assert_eq!(name(top_pick(&results, "keep", |_| false)), "Broken Chairs");
         results.tracks = None;
-        assert_eq!(name(top_pick(&results, "keep")), "keepsecrets");
+        assert_eq!(name(top_pick(&results, "keep", |_| false)), "keepsecrets");
     }
 }
