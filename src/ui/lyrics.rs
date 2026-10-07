@@ -33,6 +33,30 @@ fn blend(from: egui::Color32, to: egui::Color32, t: f32) -> egui::Color32 {
     egui::Color32::from(egui::Rgba::from(from) * (1.0 - t) + egui::Rgba::from(to) * t)
 }
 
+/// Marks the timed line under the pointer as one a click jumps to:
+/// brightened to `color` and underlined, like a link, before the click.
+fn mark_hovered_line(
+    ui: &egui::Ui,
+    response: &egui::Response,
+    galley: &std::sync::Arc<egui::Galley>,
+    color: Color32,
+) {
+    if !response.hovered() {
+        return;
+    }
+    let painter = ui.painter();
+    painter.galley_with_override_text_color(response.rect.min, galley.clone(), color);
+    let offset = response.rect.min.to_vec2();
+    for row in &galley.rows {
+        let row = row.rect().translate(offset);
+        painter.hline(
+            row.x_range(),
+            row.bottom() - 1.0,
+            egui::Stroke::new(1.5, color),
+        );
+    }
+}
+
 pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
     let palette = app.palette;
     let fit = super::yielding_panel(
@@ -224,8 +248,8 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
                 } else {
                     Sense::hover()
                 };
-                let response = if crate::bidi::is_rtl(text) {
-                    let galley = crate::bidi::layout(
+                let galley = if crate::bidi::is_rtl(text) {
+                    crate::bidi::layout(
                         ui.painter(),
                         text,
                         font,
@@ -233,14 +257,15 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
                         ui.available_width(),
                         usize::MAX,
                         None,
-                    );
-                    ui.add(egui::Label::new(galley).sense(sense))
-                } else {
-                    ui.add(
-                        egui::Label::new(egui::RichText::new(text).font(font).color(color))
-                            .sense(sense),
                     )
+                } else {
+                    ui.painter()
+                        .layout(text.to_owned(), font, color, ui.available_width())
                 };
+                let response = ui.add(egui::Label::new(galley.clone()).sense(sense));
+                if lyrics.synced {
+                    mark_hovered_line(ui, &response, &galley, palette.text);
+                }
                 crate::autoscroll::row(ui, &response);
                 let rect = response.rect;
                 if lyrics.synced
@@ -976,7 +1001,11 @@ fn fullscreen_contents(app: &mut App, ui: &mut egui::Ui) {
                 let response = ui
                     .scope(|ui| {
                         ui.multiply_opacity(edge * edge * (3.0 - 2.0 * edge));
-                        ui.add(egui::Label::new(galley).sense(sense))
+                        let response = ui.add(egui::Label::new(galley.clone()).sense(sense));
+                        if lyrics.synced {
+                            mark_hovered_line(ui, &response, &galley, palette.text);
+                        }
+                        response
                     })
                     .inner;
                 let rect = response.rect;
