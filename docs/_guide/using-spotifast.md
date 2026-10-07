@@ -503,6 +503,19 @@ the middle of the screen.
 Since 0.10.0, quitting while lyrics are full screen no longer leaves
 the next launch stuck in full screen: the window returns to its previous size.
 
+To see just the cover, choose the **Now playing view** button at the end of
+the player bar. The playing song's cover fills the window over its blurred
+artwork, with the title and artists beneath, beside the queue or lyrics panel
+if one is open. Choose the cover to open its album. The expand button in the
+view's header fills the screen with it; the view works the same either way.
+While a song plays, the player bar and the header fade away after a few
+seconds without input; with the cover alone, the title and artists then come
+to rest at the bottom left. Move the pointer to bring the controls back. They
+stay while playback is paused. The microphone button, or **L**, brings
+the lyrics in beside the cover and hides them again, and the queue button
+shows the queue beside it, all without leaving the view. Press **Esc** to step back: from full screen to the view
+in the window, then from the view to your page.
+
 | Dark theme | Light theme |
 | --- | --- |
 | ![Full-screen lyrics with the dark player bar](/assets/images/lyrics-fullscreen-dark.png) | ![Full-screen lyrics with the light player bar](/assets/images/lyrics-fullscreen-light.png) |

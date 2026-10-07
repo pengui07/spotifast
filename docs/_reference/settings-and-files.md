@@ -308,7 +308,7 @@ and `--demo-show` adds surfaces on top of it: a comma separated list of
 `collection-loading`, `shuffle-selected`, `shuffle-started`, `library-list`,
 `library-list-narrow`, `library-list-wide`, `library-grid`, `library-grid-narrow`,
 `library-grid-wide`, `rtl`, `player-bar-spectrum`, `player-bar-waveform`,
-`lyrics-fullscreen-view`, `lyrics-fullscreen-instrumental`, `signed-out`, and `connecting`. The Library variants show the list or cover grid with
+`lyrics-fullscreen-view`, `lyrics-fullscreen-instrumental`, `cover-fullscreen-view`, `cover-view`, `signed-out`, and `connecting`. The Library variants show the list or cover grid with
 a normal, narrow, or wide sidebar and collapsed artwork for matching captures.
 `shuffle-selected` and `shuffle-started` capture the selected-mode and
 playback-started outcomes of a collection Shuffle click. `update` shows a sample
@@ -320,6 +320,8 @@ session connects.
 sound on this computer with that player bar visualizer on.
 `lyrics-fullscreen-view` and `lyrics-fullscreen-instrumental` draw full-screen
 lyrics, with words or without, at the window's own size.
+`cover-view` opens the Now playing view in the window, and
+`cover-fullscreen-view` opens it filling the screen.
 `rtl` gives the first songs of `playlist:pl1` invented Hebrew and Arabic
 titles, some mixed with English, numbers, and brackets.
 `collection-loading` keeps known collection metadata and placeholder artwork

@@ -286,12 +286,29 @@ fn contents(app: &mut App, ui: &mut egui::Ui) {
 }
 
 pub fn fullscreen(app: &mut App, ui: &mut egui::Ui) {
+    // Drawn over the backdrop the window's layout has already painted.
     egui::CentralPanel::default()
-        .frame(Frame::new().fill(theme::Palette::dark().window))
+        .frame(Frame::new())
         .show(ui, |ui| {
+            theme::apply_local(ui, &theme::Palette::dark());
+            // With the controls gone, the pointer goes too.
+            if cover_controls_hidden(app, ui.ctx()) >= 1.0 {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::None);
+            }
             let rect = ui.max_rect();
-            background(app, ui, rect);
             let top = theme::titlebar_inset(ui.ctx()) + 24.0;
+            if app.fullscreen_cover {
+                cover_only(app, ui, rect, top);
+                return;
+            }
+            // In the window, the lyrics' header starts below the Windows
+            // caption buttons when they sit over it.
+            let caption = super::window_controls_reservation(ui.ctx(), false, false, rect.width());
+            let top = if caption.topbar_top > 0.0 || caption.topbar_width > 0.0 {
+                top.max(super::WINDOWS_WINDOW_CONTROLS_HEIGHT + 8.0)
+            } else {
+                top
+            };
             if app.now_playing().is_some() && rect.width() >= COVER_BESIDE_MIN_WIDTH {
                 with_cover(app, ui, rect, top);
                 return;
@@ -347,7 +364,7 @@ fn with_cover(app: &mut App, ui: &mut egui::Ui, rect: Rect, top: f32) {
             pos2(left, below.center().y - (side + 90.0) / 2.0),
             vec2(side, side + 90.0),
         );
-        big_cover(app, ui, column, Align::Min);
+        big_cover(app, ui, column, Align::Min, 1.0);
         let lyrics = Rect::from_min_max(
             pos2(column.right() + gap, below.top()),
             pos2(column.right() + gap + lyrics_width, below.bottom()),
@@ -359,7 +376,7 @@ fn with_cover(app: &mut App, ui: &mut egui::Ui, rect: Rect, top: f32) {
             .min(below.width() * 0.5)
             .clamp(200.0, 560.0);
         let column = Rect::from_center_size(below.center(), vec2(side, side + 90.0));
-        big_cover(app, ui, column, Align::Center);
+        big_cover(app, ui, column, Align::Center, 1.0);
         // Why there are no words, quietly, under the song, or that they
         // are still being fetched.
         let (heading, detail) = match &app.lyrics {
@@ -418,9 +435,171 @@ fn with_cover(app: &mut App, ui: &mut egui::Ui, rect: Rect, top: f32) {
     }
 }
 
+/// Only the cover, as large as the space allows, at any window width: full
+/// screen, or the Now playing view in the window. Clicking it opens its
+/// album or show.
+fn cover_only(app: &mut App, ui: &mut egui::Ui, rect: Rect, top: f32) {
+    let hidden = cover_controls_hidden(app, ui.ctx());
+    let controls = controls_opacity(hidden);
+    let outer = Rect::from_min_max(
+        pos2(rect.left() + 48.0, rect.top() + top),
+        pos2(rect.right() - 48.0, rect.bottom() - 40.0),
+    );
+    // In the window, the Windows caption buttons may sit at the header's
+    // right end when no panel is open beside it. The view draws only the
+    // queue's panel: a lyrics panel left open behind it is not on screen.
+    let caption =
+        super::window_controls_reservation(ui.ctx(), app.show_queue_panel, false, rect.width());
+    let header_rect = Rect::from_min_max(
+        pos2(outer.left(), outer.top() + caption.topbar_top),
+        pos2(
+            outer
+                .right()
+                .min(rect.right() - caption.topbar_width - 12.0),
+            outer.bottom(),
+        ),
+    );
+    let mut header = ui.new_child(UiBuilder::new().max_rect(header_rect));
+    fullscreen_header(app, &mut header);
+    let below = Rect::from_min_max(
+        pos2(outer.left(), header.min_rect().bottom() + 24.0),
+        outer.max,
+    );
+    let Some(now) = app.now_playing() else {
+        let mut content = ui.new_child(UiBuilder::new().max_rect(below));
+        widgets::empty_state(
+            &mut content,
+            &theme::Palette::dark(),
+            Icon::Music,
+            &gettext(app.locale, "Nothing playing"),
+            &gettext(app.locale, "Pick a song, album, or playlist"),
+        );
+        return;
+    };
+    let side = cover_only_side(below.size());
+    let column = Rect::from_center_size(below.center(), vec2(side, side + 90.0));
+    big_cover(app, ui, column, Align::Center, controls);
+    // Once the bar has gone, the title and artists come to rest in its
+    // place at the bottom left, out of the cover's way.
+    let corner_opacity = corner_words_opacity(hidden);
+    if corner_opacity > 0.0 {
+        let bottom = ui.ctx().content_rect().bottom() - 40.0;
+        let corner = Rect::from_min_max(
+            pos2(rect.left() + 48.0, bottom - 120.0),
+            pos2(rect.center().x, bottom),
+        );
+        let mut words = ui.new_child(
+            UiBuilder::new()
+                .max_rect(corner)
+                .layer_id(egui::LayerId::new(
+                    egui::Order::Middle,
+                    egui::Id::new("cover-corner-words"),
+                ))
+                .layout(Layout::bottom_up(Align::Min)),
+        );
+        words.set_clip_rect(corner);
+        words.multiply_opacity(corner_opacity);
+        track_words(&mut words, &now.title, &now.subtitle);
+    }
+    let cover = Rect::from_min_size(column.min, vec2(side, side));
+    let response = ui.interact(cover, egui::Id::new("fullscreen-cover"), Sense::click());
+    // A click that wakes the hidden controls only wakes them.
+    if response.clicked() && hidden < 0.5 {
+        if let Some(id) = now.album_id {
+            app.actions
+                .push(Action::Open(crate::model::Page::Album(id)));
+        } else if let Some(id) = now.show_id {
+            app.actions.push(Action::Open(crate::model::Page::Show(id)));
+        }
+    }
+    if hidden < 1.0 && response.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+}
+
+/// How long the Now playing cover waits, without the pointer moving or a
+/// key being pressed, before its controls and the player bar fade away.
+const COVER_IDLE_SECONDS: f64 = 3.0;
+/// How long the whole change takes, out or back in. It runs in two steps:
+/// the controls, the player bar among them, fade first; then the title and
+/// artists fade in at the bottom left. Coming back runs the steps in
+/// reverse.
+const COVER_FADE_SECONDS: f32 = 0.8;
+
+/// The first step: how much of the controls still shows.
+pub(super) fn controls_opacity(hidden: f32) -> f32 {
+    1.0 - smoothstep(hidden * 2.0)
+}
+
+/// The second step: how much of the title and artists in the corner shows.
+fn corner_words_opacity(hidden: f32) -> f32 {
+    smoothstep(hidden * 2.0 - 1.0)
+}
+
+/// Eases a step in and out, so neither end starts or stops abruptly.
+fn smoothstep(t: f32) -> f32 {
+    let t = t.clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+/// How far the Now playing cover's controls, the player bar among them,
+/// have faded away: 0 shown, 1 gone. Moving the pointer or pressing a key
+/// brings them back, and they stay while the pointer rests on the bar.
+pub(super) fn cover_controls_hidden(app: &App, ctx: &egui::Context) -> f32 {
+    let id = egui::Id::new("fullscreen-cover-activity");
+    if !app.view_open() {
+        ctx.data_mut(|data| data.remove::<f64>(id));
+        return 0.0;
+    }
+    // Paused, the controls stay: they are what plays the song again.
+    let paused = app.now_playing().is_none_or(|now| !now.playing);
+    let (now, active) = ctx.input(|input| {
+        let over_bar = input.pointer.hover_pos().is_some_and(|position| {
+            position.y >= input.content_rect().bottom() - theme::PLAYER_BAR_HEIGHT
+        });
+        let acted = input.events.iter().any(|event| {
+            matches!(
+                event,
+                egui::Event::PointerMoved(_)
+                    | egui::Event::PointerButton { .. }
+                    | egui::Event::MouseWheel { .. }
+                    | egui::Event::Key { .. }
+                    | egui::Event::Text(_)
+                    | egui::Event::Touch { .. }
+            )
+        });
+        (input.time, over_bar || acted || paused || app.show_devices)
+    });
+    let last = ctx.data_mut(|data| {
+        let last = data.get_temp_mut_or_insert_with(id, || now);
+        if active {
+            *last = now;
+        }
+        *last
+    });
+    let idle = now - last >= COVER_IDLE_SECONDS;
+    if !idle {
+        ctx.request_repaint_after(std::time::Duration::from_secs_f64(
+            COVER_IDLE_SECONDS - (now - last),
+        ));
+    }
+    ctx.animate_bool_with_time(
+        egui::Id::new("fullscreen-cover-hidden"),
+        idle,
+        COVER_FADE_SECONDS,
+    )
+}
+
+/// The cover's side in the full screen cover view: as large as the space
+/// below the header allows, leaving room for the title and artists beneath.
+fn cover_only_side(space: egui::Vec2) -> f32 {
+    (space.y - 140.0).min(space.x).clamp(0.0, 900.0)
+}
+
 /// The playing song's cover filling the top of `column`, with its title and
-/// artists beneath, aligned to its left edge or centred.
-fn big_cover(app: &App, ui: &mut egui::Ui, column: Rect, align: Align) {
+/// artists beneath, aligned to its left edge or centred, the words at
+/// `words_opacity`.
+fn big_cover(app: &App, ui: &mut egui::Ui, column: Rect, align: Align, words_opacity: f32) {
     let Some(now) = app.now_playing() else {
         return;
     };
@@ -451,23 +630,33 @@ fn big_cover(app: &App, ui: &mut egui::Ui, column: Rect, align: Align) {
             .max_rect(words)
             .layout(Layout::top_down(align)),
     );
-    text.spacing_mut().item_spacing.y = 4.0;
-    text.add(
-        egui::Label::new(
-            egui::RichText::new(&now.title)
-                .font(theme::semibold(22.0))
-                .color(Color32::WHITE),
-        )
-        .truncate(),
-    );
-    text.add(
-        egui::Label::new(
-            egui::RichText::new(&now.subtitle)
-                .font(theme::regular(14.0))
-                .color(Color32::from_gray(225)),
-        )
-        .truncate(),
-    );
+    text.multiply_opacity(words_opacity);
+    track_words(&mut text, &now.title, &now.subtitle);
+}
+
+/// The song's title over its artists, in the order of `ui`'s layout: a
+/// bottom-up layout is given the artists first.
+fn track_words(ui: &mut egui::Ui, title: &str, artists: &str) {
+    ui.spacing_mut().item_spacing.y = 4.0;
+    let title = egui::Label::new(
+        egui::RichText::new(title)
+            .font(theme::semibold(22.0))
+            .color(Color32::WHITE),
+    )
+    .truncate();
+    let artists = egui::Label::new(
+        egui::RichText::new(artists)
+            .font(theme::regular(14.0))
+            .color(Color32::from_gray(225)),
+    )
+    .truncate();
+    if ui.layout().main_dir() == egui::Direction::BottomUp {
+        ui.add(artists);
+        ui.add(title);
+    } else {
+        ui.add(title);
+        ui.add(artists);
+    }
 }
 
 fn fullscreen_content_width(viewport_width: f32) -> f32 {
@@ -479,12 +668,15 @@ fn preferred_backdrop_art(small: Option<String>, large: Option<String>) -> Optio
     small.or(large)
 }
 
-fn background(app: &mut App, ui: &mut egui::Ui, rect: Rect) {
-    theme::apply_local(ui, &theme::Palette::dark());
+/// The blurred cover behind the Now playing view. It is painted across the
+/// whole window, under the player bar too, so the bar fades into it rather
+/// than into black, and nothing moves when the bar goes.
+pub(super) fn backdrop(app: &mut App, ui: &mut egui::Ui, rect: Rect) {
     let art = app
         .now_playing()
         .and_then(|now| preferred_backdrop_art(now.art_small, now.art_url));
     let painter = ui.painter().with_clip_rect(rect);
+    painter.rect_filled(rect, 0.0, theme::Palette::dark().window);
     if let Some(texture) = app
         .lyrics_backdrop
         .texture(ui.ctx(), app.backend.art(), art.as_deref())
@@ -515,19 +707,57 @@ fn cover_uv(view: egui::Vec2, image: egui::Vec2) -> Rect {
     Rect::from_center_size(pos2(0.5, 0.5), size)
 }
 
+/// The view's header, fading away with the player bar while nothing moves.
 fn fullscreen_header(app: &mut App, ui: &mut egui::Ui) {
     let palette = theme::Palette::dark();
+    let windowed = app.lyrics_fullscreen.is_none();
+    let controls = controls_opacity(cover_controls_hidden(app, ui.ctx()));
     ui.horizontal(|ui| {
+        ui.multiply_opacity(controls);
+        if controls < 0.5 {
+            ui.disable();
+        }
         theme::text(
             ui,
-            gettext(app.locale, "Lyrics"),
+            if app.fullscreen_cover {
+                gettext(app.locale, "Now playing")
+            } else {
+                gettext(app.locale, "Lyrics")
+            },
             theme::bold(18.0),
             palette.text,
         );
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            if theme::icon_button(
+            // In the window the view closes or fills the screen; full
+            // screen steps back to the window.
+            if windowed {
+                if theme::icon_button(
+                    ui,
+                    Icon::Minimize2,
+                    18.0,
+                    palette.text,
+                    palette.text,
+                    &gettext(app.locale, "Close Now playing view (Esc)"),
+                )
+                .clicked()
+                {
+                    app.actions.push(Action::ToggleCoverView);
+                }
+                if theme::icon_button(
+                    ui,
+                    Icon::Maximize,
+                    18.0,
+                    palette.text,
+                    palette.text,
+                    &gettext(app.locale, "Full screen"),
+                )
+                .clicked()
+                {
+                    app.actions.push(Action::ShowCoverFullscreen);
+                }
+            } else if theme::icon_button(
                 ui,
-                Icon::Shrink,
+                Icon::Minimize,
                 18.0,
                 palette.text,
                 palette.text,
@@ -537,8 +767,18 @@ fn fullscreen_header(app: &mut App, ui: &mut egui::Ui) {
             {
                 app.actions.push(Action::SetLyricsFullscreen(false));
             }
+            // Switches between the cover alone and the cover with lyrics.
+            let (mic, tooltip) = if app.fullscreen_cover {
+                (palette.secondary, gettext(app.locale, "Show lyrics"))
+            } else {
+                (palette.accent, gettext(app.locale, "Hide lyrics"))
+            };
+            if theme::icon_button(ui, Icon::Mic, 18.0, mic, palette.text, &tooltip).clicked() {
+                app.actions.push(Action::ToggleLyricsPanel);
+            }
             let loaded = matches!(&app.lyrics, Loadable::Loaded(Some(_)));
-            if loaded
+            if !app.fullscreen_cover
+                && loaded
                 && !app.lyrics_following
                 && theme::pill_button(
                     ui,
@@ -793,6 +1033,21 @@ fn fullscreen_contents(app: &mut App, ui: &mut egui::Ui) {
 #[cfg(test)]
 mod tests {
     use super::{fullscreen_content_width, preferred_backdrop_art};
+
+    /// The title and artists come to the corner only once the bar has
+    /// gone, and the bar comes back only once they have left it.
+    #[test]
+    fn corner_words_never_show_beside_the_fading_bar() {
+        use super::{controls_opacity, corner_words_opacity};
+        for step in 0..=100 {
+            let hidden = step as f32 / 100.0;
+            let bar = controls_opacity(hidden);
+            let words = corner_words_opacity(hidden);
+            assert!(bar == 0.0 || words == 0.0, "both show at {hidden}");
+        }
+        assert_eq!(controls_opacity(0.0), 1.0);
+        assert_eq!(corner_words_opacity(1.0), 1.0);
+    }
 
     #[test]
     fn fullscreen_backdrop_prefers_small_art_with_large_art_as_fallback() {

@@ -45,10 +45,17 @@ pub(crate) fn end_tint_session(ctx: &egui::Context) {
 }
 
 pub fn show(app: &mut App, ui: &mut egui::Ui) {
+    show_sliding(app, ui, 1.0);
+}
+
+/// The bar with `shown` of its height in the window, 0 to 1: the Now
+/// playing view slides it down out of the window while nothing moves, and
+/// the panels above grow into its place.
+pub fn show_sliding(app: &mut App, ui: &mut egui::Ui, shown: f32) {
     let palette = app.palette;
     let fill = eased_fill(ui.ctx(), palette.panel, app.now_playing_tint());
     egui::Panel::bottom("player-bar")
-        .exact_size(theme::PLAYER_BAR_HEIGHT)
+        .exact_size(theme::PLAYER_BAR_HEIGHT * shown.clamp(0.0, 1.0))
         .resizable(false)
         .show_separator_line(false)
         .frame(
@@ -57,7 +64,12 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 .inner_margin(Margin::symmetric(16, 0)),
         )
         .show(ui, |ui| {
-            let rect = ui.max_rect();
+            // Laid out at its full height from its top edge, so a partly
+            // shown bar slides rather than squeezes.
+            let rect = Rect::from_min_size(
+                ui.max_rect().min,
+                vec2(ui.max_rect().width(), theme::PLAYER_BAR_HEIGHT),
+            );
             let now = app.now_playing();
             // The whole bar, margins included, behind everything else.
             let behind = rect.expand2(vec2(16.0, 0.0));
@@ -797,6 +809,16 @@ fn transport(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, region:
     );
 }
 
+/// Whether the lyrics are on screen: beside the cover in full screen, or
+/// in their panel.
+fn lyrics_shown(app: &App) -> bool {
+    if app.view_open() {
+        !app.fullscreen_cover
+    } else {
+        app.show_lyrics_panel
+    }
+}
+
 fn extras(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>) {
     let palette = app.palette;
     ui.spacing_mut().item_spacing.x = 6.0;
@@ -921,7 +943,7 @@ fn extras(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>) {
         ui,
         Icon::Mic,
         18.0,
-        if app.show_lyrics_panel {
+        if lyrics_shown(app) {
             palette.accent
         } else {
             palette.secondary
@@ -932,6 +954,47 @@ fn extras(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>) {
     .clicked()
     {
         app.actions.push(Action::ToggleLyricsPanel);
+    }
+    // The Now playing view, when the bar has room for it beside the
+    // others; in full screen it leaves, lyrics or cover.
+    let (icon, lit, tooltip, action) = if app.lyrics_fullscreen.is_some() {
+        (
+            Icon::Minimize,
+            true,
+            gettext(app.locale, "Leave full screen (Esc)"),
+            Action::SetLyricsFullscreen(false),
+        )
+    } else if app.cover_view {
+        (
+            Icon::Minimize2,
+            true,
+            gettext(app.locale, "Close Now playing view (Esc)"),
+            Action::ToggleCoverView,
+        )
+    } else {
+        (
+            Icon::Maximize2,
+            false,
+            gettext(app.locale, "Now playing view"),
+            Action::ToggleCoverView,
+        )
+    };
+    if ui.available_width() >= 30.0
+        && theme::icon_button(
+            ui,
+            icon,
+            18.0,
+            if lit {
+                palette.accent
+            } else {
+                palette.secondary
+            },
+            palette.text,
+            &tooltip,
+        )
+        .clicked()
+    {
+        app.actions.push(action);
     }
 }
 

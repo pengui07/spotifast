@@ -407,6 +407,12 @@ pub struct App {
     pub show_queue_panel: bool,
     pub show_lyrics_panel: bool,
     pub lyrics_fullscreen: Option<bool>,
+    /// The full screen view shows only the cover, without the lyrics.
+    pub fullscreen_cover: bool,
+    /// The Now playing view: the cover filling the window, beside the
+    /// queue or lyrics panel, without taking the screen. Leaving the full
+    /// screen cover returns to it.
+    pub cover_view: bool,
     pub lyrics_fullscreen_seen: bool,
     lyrics_fullscreen_restoring: Option<bool>,
     lyrics_restore_maximized: bool,
@@ -858,6 +864,8 @@ impl App {
             show_queue_panel: session.queue_open.unwrap_or(false),
             show_lyrics_panel: false,
             lyrics_fullscreen: None,
+            fullscreen_cover: false,
+            cover_view: false,
             lyrics_fullscreen_seen: false,
             lyrics_fullscreen_restoring: None,
             lyrics_restore_maximized: false,
@@ -8210,8 +8218,65 @@ impl App {
         }
     }
 
+    /// Fills the screen with the full screen view, the lyrics or the cover
+    /// as `fullscreen_cover` says, remembering the window mode to return to.
+    fn enter_fullscreen_view(&mut self, ctx: &egui::Context) {
+        if self.lyrics_fullscreen.is_some() {
+            return;
+        }
+        self.lyrics_fullscreen =
+            Some(self.lyrics_fullscreen_restoring.take().unwrap_or_else(|| {
+                ctx.input(|input| input.viewport().fullscreen.unwrap_or(false))
+            }));
+        #[cfg(windows)]
+        {
+            // Winit's undecorated maximized Windows client area is
+            // constrained to the work area, even in fullscreen.
+            // Clear maximization before entering, then restore it
+            // together with the original window mode on exit.
+            self.lyrics_restore_maximized |= self.lyrics_fullscreen == Some(false)
+                && ctx.input(|input| input.viewport().maximized.unwrap_or(false));
+            if self.lyrics_restore_maximized {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(false));
+            }
+        }
+        self.lyrics_fullscreen_seen = false;
+        ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(true));
+    }
+
+    /// Whether the Now playing view is open, in the window or full screen.
+    pub fn view_open(&self) -> bool {
+        self.lyrics_fullscreen.is_some() || self.cover_view
+    }
+
+    /// Brings the lyrics in beside the cover in the Now playing view, in
+    /// place of the queue.
+    fn show_view_lyrics(&mut self) {
+        self.fullscreen_cover = false;
+        self.show_lyrics_panel = true;
+        self.show_queue_panel = false;
+        self.lyrics_following = true;
+        self.lyrics_line_shown = None;
+        self.request_lyrics();
+    }
+
+    /// Closes the Now playing view in the window.
+    fn close_cover_view(&mut self) {
+        if self.cover_view {
+            self.cover_view = false;
+            self.fullscreen_cover = false;
+        }
+    }
+
+    /// Leaves full screen: to the Now playing view in the window when it
+    /// came from there or shows the cover, otherwise from the lyrics to
+    /// where they were opened.
     fn leave_lyrics_fullscreen(&mut self, ctx: &egui::Context) {
         if let Some(was_fullscreen) = self.lyrics_fullscreen.take() {
+            self.cover_view |= self.fullscreen_cover;
+            if !self.cover_view {
+                self.fullscreen_cover = false;
+            }
             ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(was_fullscreen));
             if self.lyrics_restore_maximized {
                 ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(true));
@@ -8234,9 +8299,10 @@ impl App {
                 | Action::Forward
                 | Action::SignOut
                 | Action::ToggleWinampWindow
-                | Action::ToggleQueuePanel
         ) {
+            // Going elsewhere closes the cover and lyrics views altogether.
             self.leave_lyrics_fullscreen(ctx);
+            self.close_cover_view();
         }
         match action {
             Action::Open(page) => self.open(page),
@@ -8925,7 +8991,21 @@ impl App {
                 self.show_queue_panel = !self.show_queue_panel;
                 if self.show_queue_panel {
                     self.show_lyrics_panel = false;
+                    // In the Now playing view the queue sits beside the
+                    // cover, in place of the lyrics.
+                    self.fullscreen_cover |= self.view_open();
                     self.refresh_queue(true);
+                }
+            }
+            // In the Now playing view, the lyrics button brings the words in
+            // beside the cover and takes them away again; it never leaves.
+            Action::ToggleLyricsPanel if self.view_open() => {
+                if self.fullscreen_cover {
+                    self.show_view_lyrics();
+                } else {
+                    // Hidden here, they stay hidden on leaving.
+                    self.fullscreen_cover = true;
+                    self.show_lyrics_panel = false;
                 }
             }
             Action::ToggleLyricsPanel => {
@@ -8938,38 +9018,36 @@ impl App {
                 }
             }
             Action::SetLyricsFullscreen(fullscreen) => {
-                if fullscreen && self.lyrics_fullscreen.is_none() {
-                    self.lyrics_fullscreen =
-                        Some(self.lyrics_fullscreen_restoring.take().unwrap_or_else(|| {
-                            ctx.input(|input| input.viewport().fullscreen.unwrap_or(false))
-                        }));
-                    #[cfg(windows)]
-                    {
-                        // Winit's undecorated maximized Windows client area is
-                        // constrained to the work area, even in fullscreen.
-                        // Clear maximization before entering, then restore it
-                        // together with the original window mode on exit.
-                        self.lyrics_restore_maximized |= self.lyrics_fullscreen == Some(false)
-                            && ctx.input(|input| input.viewport().maximized.unwrap_or(false));
-                        if self.lyrics_restore_maximized {
-                            ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(false));
-                        }
-                    }
-                    self.lyrics_fullscreen_seen = false;
-                    self.show_lyrics_panel = true;
-                    self.show_queue_panel = false;
-                    self.lyrics_following = true;
-                    self.lyrics_line_shown = None;
-                    self.request_lyrics();
-                    ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(true));
-                } else if !fullscreen {
+                if !fullscreen {
                     self.leave_lyrics_fullscreen(ctx);
+                } else if self.lyrics_fullscreen.is_none() || self.fullscreen_cover {
+                    // Entering, or bringing the words in beside the cover.
+                    self.show_view_lyrics();
+                    self.enter_fullscreen_view(ctx);
+                }
+            }
+            Action::ShowCoverFullscreen => {
+                if self.lyrics_fullscreen.is_none() {
+                    // From the Now playing view, the screen shows what the
+                    // view showed, lyrics or not.
+                    self.fullscreen_cover |= !self.cover_view;
+                    self.enter_fullscreen_view(ctx);
+                }
+            }
+            Action::ToggleCoverView => {
+                if self.lyrics_fullscreen.is_some() {
+                    self.leave_lyrics_fullscreen(ctx);
+                } else if self.cover_view {
+                    self.close_cover_view();
+                } else {
+                    self.cover_view = true;
+                    self.fullscreen_cover = true;
                 }
             }
             Action::LyricsLineShown(line) => {
                 // Escape or navigation may already have left the view earlier
                 // in this frame. The returning panel still needs to reposition.
-                if self.lyrics_fullscreen.is_some() {
+                if self.view_open() {
                     self.lyrics_line_shown = Some(line);
                 }
             }
@@ -17058,6 +17136,94 @@ mod tests {
     }
 
     #[test]
+    fn fullscreen_cover_switches_to_lyrics_and_back_without_leaving() {
+        let mut app = headless_app();
+        let ctx = egui::Context::default();
+        let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
+            app.show_queue_panel = true;
+            app.apply(Action::ShowCoverFullscreen, ui.ctx());
+            assert!(app.fullscreen_cover);
+            assert_eq!(app.lyrics_fullscreen, Some(false));
+            // The cover alone leaves the panels as they were.
+            assert!(app.show_queue_panel && !app.show_lyrics_panel);
+
+            // The lyrics button brings the words in and takes them away
+            // again, staying in full screen both times.
+            for _ in 0..2 {
+                app.apply(Action::ToggleLyricsPanel, ui.ctx());
+                assert!(!app.fullscreen_cover);
+                assert!(app.show_lyrics_panel && !app.show_queue_panel);
+                assert_eq!(app.lyrics_fullscreen, Some(false));
+
+                app.apply(Action::ToggleLyricsPanel, ui.ctx());
+                assert!(app.fullscreen_cover);
+                assert!(!app.show_lyrics_panel);
+                assert_eq!(app.lyrics_fullscreen, Some(false));
+            }
+
+            // The queue opens beside the cover, in place of the lyrics,
+            // and closes again, all in full screen.
+            app.apply(Action::SetLyricsFullscreen(true), ui.ctx());
+            app.apply(Action::ToggleQueuePanel, ui.ctx());
+            assert!(app.fullscreen_cover);
+            assert!(app.show_queue_panel && !app.show_lyrics_panel);
+            assert_eq!(app.lyrics_fullscreen, Some(false));
+            app.apply(Action::ToggleQueuePanel, ui.ctx());
+            assert!(app.fullscreen_cover && !app.show_queue_panel);
+            assert_eq!(app.lyrics_fullscreen, Some(false));
+
+            // Leaving full screen returns to the Now playing view in the
+            // window, still showing the cover, and closing that returns to
+            // the page.
+            app.apply(Action::SetLyricsFullscreen(false), ui.ctx());
+            assert!(app.cover_view && app.fullscreen_cover);
+            assert!(!app.show_lyrics_panel);
+            assert_eq!(app.lyrics_fullscreen, None);
+            app.apply(Action::ToggleCoverView, ui.ctx());
+            assert!(!app.cover_view && !app.fullscreen_cover);
+
+            // The view opens from the player bar, and going to a page
+            // closes it.
+            app.apply(Action::ToggleCoverView, ui.ctx());
+            assert!(app.cover_view && app.fullscreen_cover);
+            assert_eq!(app.lyrics_fullscreen, None);
+
+            // In the window the view works as in full screen: the lyrics
+            // come in beside the cover, not in their panel.
+            app.apply(Action::ToggleLyricsPanel, ui.ctx());
+            assert!(app.cover_view && !app.fullscreen_cover);
+            assert_eq!(app.lyrics_fullscreen, None);
+
+            // Filling the screen keeps the lyrics, and leaving it returns
+            // to the view in the window with them still there.
+            app.apply(Action::ShowCoverFullscreen, ui.ctx());
+            assert!(!app.fullscreen_cover);
+            assert_eq!(app.lyrics_fullscreen, Some(false));
+            app.apply(Action::SetLyricsFullscreen(false), ui.ctx());
+            assert!(app.cover_view && !app.fullscreen_cover);
+            assert_eq!(app.lyrics_fullscreen, None);
+
+            app.apply(Action::Open(Page::Home), ui.ctx());
+            assert!(!app.cover_view && !app.fullscreen_cover);
+        });
+        output.textures_delta.clear();
+        let commands: Vec<_> = output.viewport_output[&egui::ViewportId::ROOT]
+            .commands
+            .iter()
+            .filter_map(|command| match command {
+                egui::ViewportCommand::Fullscreen(value) => Some(*value),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            commands,
+            vec![true, false, true, false],
+            "each entry has its one exit"
+        );
+        app.backend.shutdown();
+    }
+
+    #[test]
     fn native_fullscreen_exit_restores_the_previous_window_mode() {
         for was_fullscreen in [false, true] {
             let mut app = headless_app();
@@ -17252,7 +17418,7 @@ mod tests {
     }
 
     #[test]
-    fn closing_lyrics_leaves_fullscreen() {
+    fn closing_lyrics_in_fullscreen_shows_the_cover() {
         let mut app = headless_app();
         let ctx = egui::Context::default();
         let mut output = ctx.run_ui(Default::default(), |ui| {
@@ -17261,9 +17427,10 @@ mod tests {
         });
         output.textures_delta.clear();
         assert!(!app.show_lyrics_panel);
-        assert_eq!(app.lyrics_fullscreen, None);
+        assert!(app.fullscreen_cover);
+        assert_eq!(app.lyrics_fullscreen, Some(false));
         assert!(
-            output.viewport_output[&egui::ViewportId::ROOT]
+            !output.viewport_output[&egui::ViewportId::ROOT]
                 .commands
                 .contains(&egui::ViewportCommand::Fullscreen(false))
         );

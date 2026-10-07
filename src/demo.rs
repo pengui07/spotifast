@@ -1084,6 +1084,11 @@ pub fn apply_flags(app: &mut App, page: Option<&str>, show: Option<&str>) {
                 app.show_lyrics_panel = true;
                 app.lyrics_fullscreen = Some(false);
             }
+            // The Now playing view filling the screen, as its Full screen
+            // button does.
+            "cover-fullscreen-view" => app.actions.push(Action::ShowCoverFullscreen),
+            // The Now playing view in the window.
+            "cover-view" => app.cover_view = true,
             // Emoji in titles, artists, playlist names and lyrics: joined
             // sequences, skin tones, flags and keycaps. Give it after
             // `lyrics` to put emoji in the words too.

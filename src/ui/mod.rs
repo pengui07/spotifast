@@ -62,8 +62,27 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             ),
         );
     }
-    player_bar::show(app, ui);
-    if app.lyrics_fullscreen.is_some() {
+    // The Now playing cover fades the bar away while nothing moves.
+    // It slides down out of the window as it fades, the panels above
+    // growing into its place over the backdrop behind the whole window.
+    if app.view_open() {
+        lyrics::backdrop(app, ui, ctx.content_rect());
+    }
+    let bar = lyrics::controls_opacity(lyrics::cover_controls_hidden(app, ctx));
+    // Gone, it is not drawn at all: its visualizer would otherwise keep
+    // asking for sixty frames a second that nobody sees.
+    if bar > 0.0 {
+        let opacity = ui.opacity();
+        ui.set_opacity(opacity * bar);
+        player_bar::show_sliding(app, ui, bar);
+        ui.set_opacity(opacity);
+    }
+    if app.view_open() {
+        // The Now playing view, full screen or in the window, takes the
+        // page and the sidebar's place; its cover keeps the queue beside it.
+        if app.fullscreen_cover && app.show_queue_panel {
+            queue::side_panel(app, ui);
+        }
         lyrics::fullscreen(app, ui);
     } else {
         if app.settings.sidebar_visible {

@@ -1092,6 +1092,10 @@ pub enum Action {
     ToggleQueuePanel,
     ToggleLyricsPanel,
     SetLyricsFullscreen(bool),
+    /// Fill the screen with the playing song's cover, without the lyrics.
+    ShowCoverFullscreen,
+    /// Open or close the Now playing view: the cover filling the window.
+    ToggleCoverView,
     LyricsLineShown(Option<usize>),
     FollowLyrics,
     PauseLyricsFollow,
