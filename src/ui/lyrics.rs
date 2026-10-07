@@ -934,6 +934,9 @@ fn fullscreen_contents(app: &mut App, ui: &mut egui::Ui) {
     egui::ScrollArea::vertical()
         .id_salt(("fullscreen-lyrics-scroll", &now.uri))
         .auto_shrink([false, false])
+        // The lyrics follow the song on their own; a scroll bar beside them
+        // only clutters the view. The wheel and dragging still scroll.
+        .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
         .show(ui, |ui| {
             // Before the first line there is nothing to highlight, so the
             // panel sits at the top rather than wherever it was left.
