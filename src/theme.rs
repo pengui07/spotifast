@@ -496,6 +496,47 @@ pub fn paint_icon(ui: &egui::Ui, icon: Icon, rect: egui::Rect, size: f32, color:
     icon.image(color, size).paint_at(ui, icon_rect);
 }
 
+/// Frames in one loop of the playing bars, and how many show a second.
+const PLAYING_BARS_FRAMES: u64 = 10;
+const PLAYING_BARS_FPS: f64 = 8.0;
+
+/// Lucide's audio-lines icon, its six bars rising and falling while a song
+/// plays. A short loop of stepped frames, so it asks for a few frames a
+/// second rather than every frame.
+pub fn paint_playing_bars(ui: &egui::Ui, rect: egui::Rect, size: f32, color: Color32) {
+    // The icon's bars on its 24-unit grid: x, and the lowest and highest
+    // they reach. The middle bar is the tallest, as in the icon.
+    const BARS: [(f32, f32, f32); 6] = [
+        (2.0, 3.0, 9.0),
+        (6.0, 5.0, 13.0),
+        (10.0, 8.0, 18.0),
+        (14.0, 5.0, 14.0),
+        (18.0, 6.0, 15.0),
+        (22.0, 3.0, 9.0),
+    ];
+    let time = ui.input(|input| input.time);
+    let step = (time * PLAYING_BARS_FPS).floor();
+    let frame = (step as u64 % PLAYING_BARS_FRAMES) as f32;
+    let scale = size / 24.0;
+    let origin = rect.center() - Vec2::splat(size / 2.0);
+    let width = 2.0 * scale;
+    for (index, (x, low, high)) in BARS.into_iter().enumerate() {
+        // Each bar runs a whole number of cycles in the loop, from its own
+        // starting point, so the loop repeats without a jump.
+        let cycles = [1.0, 2.0, 1.0, 3.0, 2.0, 1.0][index];
+        let phase = index as f32 * 1.7;
+        let turn = std::f32::consts::TAU * cycles * frame / PLAYING_BARS_FRAMES as f32 + phase;
+        let height = low + (high - low) * (0.5 + 0.5 * turn.sin());
+        let center = origin + Vec2::new(x, 12.0) * scale;
+        let bar = egui::Rect::from_center_size(center, Vec2::new(width, height * scale));
+        ui.painter()
+            .rect_filled(bar, egui::CornerRadius::same((width / 2.0) as u8), color);
+    }
+    let next = (step + 1.0) / PLAYING_BARS_FPS - time;
+    ui.ctx()
+        .request_repaint_after(std::time::Duration::from_secs_f64(next.max(0.0)));
+}
+
 /// Make keyboard focus visible without changing the control's layout.
 pub fn focus_ring(ui: &egui::Ui, response: &Response) {
     if response.has_focus() {
