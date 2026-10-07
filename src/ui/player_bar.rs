@@ -427,15 +427,29 @@ fn now_playing_block(app: &mut App, ui: &mut egui::Ui, region: Rect, now: Option
         return;
     };
 
-    super::widgets::paint_cover(
-        ui,
-        &palette,
-        now.art_small.as_deref().or(now.art_url.as_deref()),
-        cover_rect,
-        6.0,
-        Icon::Music,
-        Some(app.backend.art()),
-    );
+    // While the art is docked large at the sidebar's bottom, the bar shows
+    // no second copy beside it, as Spotify does, and the words move left.
+    let art_available = now.art_url.is_some() || now.art_small.is_some();
+    let docked = art_available
+        && app.settings.art_expanded
+        && app.settings.sidebar_visible
+        && !app.view_open();
+    let cover_rect = if docked {
+        Rect::from_min_size(cover_rect.min, vec2(0.0, cover_rect.height()))
+    } else {
+        cover_rect
+    };
+    if !docked {
+        super::widgets::paint_cover(
+            ui,
+            &palette,
+            now.art_small.as_deref().or(now.art_url.as_deref()),
+            cover_rect,
+            6.0,
+            Icon::Music,
+            Some(app.backend.art()),
+        );
+    }
     let song = app.now_playing_item();
     let drag_sense = if song.is_some() {
         Sense::click_and_drag()
@@ -451,7 +465,6 @@ fn now_playing_block(app: &mut App, ui: &mut egui::Ui, region: Rect, now: Option
         });
     // Hovering the cover offers to dock the art large at the sidebar's
     // bottom, the way Spotify expands it. (#92)
-    let art_available = now.art_url.is_some() || now.art_small.is_some();
     let expand_rect = Rect::from_center_size(
         pos2(cover_rect.right() - 10.0, cover_rect.top() + 10.0),
         Vec2::splat(18.0),
@@ -487,7 +500,7 @@ fn now_playing_block(app: &mut App, ui: &mut egui::Ui, region: Rect, now: Option
         }
     }
     let heart_width = if now.is_episode { 0.0 } else { 42.0 };
-    let text_left = cover_rect.right() + 12.0;
+    let text_left = cover_rect.right() + if docked { 0.0 } else { 12.0 };
     let text_width = (region.right() - text_left - heart_width).max(40.0);
     let text_rect = Rect::from_min_size(pos2(text_left, cy - 18.0), vec2(text_width, 36.0));
     let info_response = ui.interact(text_rect, egui::Id::new("now-playing-info"), drag_sense);
