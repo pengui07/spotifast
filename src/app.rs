@@ -4616,8 +4616,12 @@ impl App {
                 Page::Album(id) => format!("spotify:album:{id}"),
                 Page::Playlist(id) => format!("spotify:playlist:{id}"),
                 Page::Show(id) => format!("spotify:show:{id}"),
+                Page::LikedSongs => crate::settings::LIKED_SONGS_KEY.to_string(),
                 _ => return None,
             },
+            Action::PlayContext { uri, .. } if uri.ends_with(":collection") => {
+                crate::settings::LIKED_SONGS_KEY.to_string()
+            }
             Action::PlayContext { uri, .. }
             | Action::PlayEpisode { uri, .. }
             | Action::PlayFromRow { uri, .. } => uri.clone(),
@@ -4636,6 +4640,42 @@ impl App {
                     .find(|entry| entry.uri == uri)
                     .cloned()
             })
+            .or_else(|| self.library_search_pick(&uri))
+    }
+
+    /// Search also shows Liked Songs and the listener's own playlists,
+    /// which Spotify's search never returns.
+    fn library_search_pick(&self, uri: &str) -> Option<crate::settings::RecentSearch> {
+        use crate::settings::{LIKED_SONGS_KEY, RecentSearch};
+        // Only what the search shows counts, not a sidebar row clicked
+        // while the Search page is open.
+        let key = crate::ui::search::search_key(&self.search.committed);
+        if key.chars().count() < 2 {
+            return None;
+        }
+        let shown = |name: &str| crate::ui::search::search_key(name).contains(&key);
+        if uri == LIKED_SONGS_KEY
+            && (shown("Liked Songs") || shown(&gettext(self.locale, "Liked Songs")))
+        {
+            return Some(RecentSearch {
+                uri: uri.to_string(),
+                name: "Liked Songs".into(),
+                detail: String::new(),
+                image: Some(LIKED_SONGS_KEY.into()),
+            });
+        }
+        let playlist = self
+            .library
+            .playlists
+            .get()?
+            .iter()
+            .find(|playlist| playlist.uri == uri && shown(&playlist.name))?;
+        Some(RecentSearch {
+            uri: uri.to_string(),
+            name: playlist.name.clone(),
+            detail: playlist.owner_name().to_string(),
+            image: crate::api::models::pick_image(&playlist.images, 160).map(str::to_string),
+        })
     }
 
     fn search_failed(&mut self, part: &str, error: impl std::fmt::Display) {
@@ -15012,6 +15052,44 @@ mod tests {
         app.settings.recent_searches.clear();
         app.apply(Action::Open(Page::Album("album".into())), &ctx);
         assert!(app.settings.recent_searches.is_empty());
+        app.backend.shutdown();
+    }
+
+    /// Liked Songs and private playlists never come back from Spotify's
+    /// search, so Search shows them from the library; opened from there they
+    /// are recent searches too, but a sidebar row clicked meanwhile is not.
+    #[test]
+    fn liked_songs_and_own_playlists_found_by_search_become_recent_searches() {
+        let ctx = egui::Context::default();
+        let mut app = test_app("search-library-picks");
+        app.library.playlists = Loadable::Loaded(vec![
+            Playlist {
+                id: "mine".into(),
+                name: "Lazy Sunday".into(),
+                uri: "spotify:playlist:mine".into(),
+                ..Playlist::default()
+            },
+            Playlist {
+                id: "other".into(),
+                name: "Gym".into(),
+                uri: "spotify:playlist:other".into(),
+                ..Playlist::default()
+            },
+        ]);
+        app.open(Page::Search);
+        searched_album_and_song(&mut app, "lazy");
+        app.apply(Action::Open(Page::Playlist("other".into())), &ctx);
+        assert!(app.settings.recent_searches.is_empty());
+        app.open(Page::Search);
+        app.apply(Action::Open(Page::Playlist("mine".into())), &ctx);
+        assert_eq!(app.settings.recent_searches[0].name, "Lazy Sunday");
+
+        app.open(Page::Search);
+        searched_album_and_song(&mut app, "liked");
+        app.apply(Action::Open(Page::LikedSongs), &ctx);
+        let liked = &app.settings.recent_searches[0];
+        assert_eq!(liked.uri, crate::settings::LIKED_SONGS_KEY);
+        assert_eq!(liked.kind(), "liked-songs");
         app.backend.shutdown();
     }
 

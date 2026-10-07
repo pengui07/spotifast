@@ -48,6 +48,11 @@ pub fn paint_cover(
     fallback: Icon,
     art: Option<&crate::images::ArtLoader>,
 ) {
+    // Liked Songs has no artwork of its own; its key stands for its tile.
+    if url == Some(crate::settings::LIKED_SONGS_KEY) {
+        super::sidebar::liked_cover(ui, rect, radius);
+        return;
+    }
     paint_cover_with_thumbnail(
         ui,
         palette,

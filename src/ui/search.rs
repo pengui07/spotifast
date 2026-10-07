@@ -8,7 +8,7 @@ use crate::api::models::{Artist, ArtistRef, PlayableItem, SearchResults, pick_im
 use crate::app::App;
 use crate::i18n::gettext;
 use crate::model::{Action, Loadable, Page, RowContext, SearchFilter};
-use crate::settings::RecentSearch;
+use crate::settings::{LIKED_SONGS_KEY, RecentSearch};
 use crate::theme::{self, Icon};
 
 use super::widgets::{self, TrackRow};
@@ -137,6 +137,7 @@ fn recent_subtitle(locale: crate::i18n::Locale, entry: &RecentSearch) -> String 
         "show" => with(gettext(locale, "Podcast • {publisher}"), "{publisher}"),
         // Translators: {podcast} is the name of the podcast the episode is from.
         "episode" => with(gettext(locale, "Episode • {podcast}"), "{podcast}"),
+        "liked-songs" => gettext(locale, "Playlist").into_owned(),
         _ => entry.detail.clone(),
     }
     .trim_end_matches([' ', '•'])
@@ -148,12 +149,19 @@ fn recent_subtitle(locale: crate::i18n::Locale, entry: &RecentSearch) -> String 
 fn recent_row(app: &mut App, ui: &mut egui::Ui, entry: &RecentSearch, width: f32) {
     let palette = app.palette;
     let subtitle = recent_subtitle(app.locale, entry);
+    let kind = entry.kind();
+    let liked = kind == "liked-songs";
+    let name = if liked {
+        gettext(app.locale, "Liked Songs").into_owned()
+    } else {
+        entry.name.clone()
+    };
     let (rect, response) = ui.allocate_exact_size(vec2(width, 64.0), Sense::click());
     response.widget_info(|| {
         egui::WidgetInfo::labeled(
             egui::WidgetType::Button,
             ui.is_enabled(),
-            format!("{}, {subtitle}", entry.name),
+            format!("{name}, {subtitle}"),
         )
     });
     // Claimed after the row, so the cross keeps its own click.
@@ -168,13 +176,14 @@ fn recent_row(app: &mut App, ui: &mut egui::Ui, entry: &RecentSearch, width: f32
         egui::WidgetInfo::labeled(
             egui::WidgetType::Button,
             ui.is_enabled(),
-            format!("Remove {}", entry.name),
+            format!("Remove {name}"),
         )
     });
-    let kind = entry.kind();
+    let context = app.playing_context_uri();
     let playing = app.believed_playing()
         && (app.current_track_uri().as_deref() == Some(entry.uri.as_str())
-            || app.playing_context_uri().as_deref() == Some(entry.uri.as_str()));
+            || context.as_deref() == Some(entry.uri.as_str())
+            || liked && context.is_some_and(|context| context.ends_with(":collection")));
     if ui.is_rect_visible(rect) {
         let hovered = ui.rect_contains_pointer(rect) || response.has_focus() || cross.has_focus();
         if hovered {
@@ -205,14 +214,8 @@ fn recent_row(app: &mut App, ui: &mut egui::Ui, entry: &RecentSearch, width: f32
         } else {
             palette.text
         };
-        let title = widgets::ellipsized(
-            ui,
-            &entry.name,
-            theme::semibold(14.5),
-            title_color,
-            text_width,
-            1,
-        );
+        let title =
+            widgets::ellipsized(ui, &name, theme::semibold(14.5), title_color, text_width, 1);
         let detail = widgets::ellipsized(
             ui,
             &subtitle,
@@ -262,11 +265,12 @@ fn recent_row(app: &mut App, ui: &mut egui::Ui, entry: &RecentSearch, width: f32
                 uri,
                 resume_ms: None,
             }),
+            "liked-songs" => Some(Action::Open(Page::LikedSongs)),
             _ => Page::from_uri(&uri).map(Action::Open),
         };
         app.actions.extend(action);
     }
-    if !matches!(kind, "track" | "episode") {
+    if !matches!(kind, "track" | "episode" | "liked-songs") {
         egui::Popup::context_menu(&response)
             .id(ui.make_persistent_id(("recent-search-menu", &entry.uri)))
             .frame(widgets::menu_frame(&palette))
@@ -279,7 +283,7 @@ fn recent_row(app: &mut App, ui: &mut egui::Ui, entry: &RecentSearch, width: f32
 fn all(app: &mut App, ui: &mut egui::Ui, results: &SearchResults) {
     let palette = app.palette;
     let locale = app.locale;
-    let owned = library_pick(&app.library, &app.search.committed);
+    let owned = library_pick(&app.library, locale, &app.search.committed);
     let top = owned.as_ref().map(Owned::top).or_else(|| {
         top_pick(results, &app.search.committed, |uri| {
             app.is_saved(uri) == Some(true)
@@ -401,6 +405,19 @@ fn all(app: &mut App, ui: &mut egui::Ui, results: &SearchResults) {
                         widgets::context_menu_items(ui, app, &show.uri, &show.name, None);
                     },
                 );
+            } else if let Some(Top::LikedSongs) = top {
+                let subtitle = liked_songs_subtitle(app);
+                top_result(
+                    app,
+                    ui,
+                    Some(LIKED_SONGS_KEY),
+                    &gettext(locale, "Liked Songs"),
+                    TopResultSubtitle::Text(&subtitle),
+                    false,
+                    liked_songs_uri(app),
+                    Page::LikedSongs,
+                    |_, _| {},
+                );
             }
         });
         if wide {
@@ -438,11 +455,12 @@ enum Top<'a> {
     Song(&'a crate::api::models::Track),
     Playlist(&'a crate::api::models::Playlist),
     Podcast(&'a crate::api::models::Show),
+    LikedSongs,
 }
 
 /// A name reduced to its letters and digits, so "Keep It Like a Secret"
 /// and "keep it like a secret!" compare equal.
-fn search_key(text: &str) -> String {
+pub(crate) fn search_key(text: &str) -> String {
     text.chars()
         .filter(|c| c.is_alphanumeric())
         .flat_map(char::to_lowercase)
@@ -528,6 +546,7 @@ enum Owned {
     Album(crate::api::models::Album),
     Playlist(crate::api::models::Playlist),
     Podcast(crate::api::models::Show),
+    LikedSongs,
 }
 
 impl Owned {
@@ -537,6 +556,7 @@ impl Owned {
             Self::Album(album) => Top::Album(album),
             Self::Playlist(playlist) => Top::Playlist(playlist),
             Self::Podcast(show) => Top::Podcast(show),
+            Self::LikedSongs => Top::LikedSongs,
         }
     }
 }
@@ -546,13 +566,18 @@ impl Owned {
 /// "fire" finds a saved Firewater even when the search returns another
 /// release of it. A followed artist, then a saved album, playlist or
 /// podcast whose name is what was typed, or else starts with it, wins.
-fn library_pick(library: &crate::model::Library, query: &str) -> Option<Owned> {
+fn library_pick(
+    library: &crate::model::Library,
+    locale: crate::i18n::Locale,
+    query: &str,
+) -> Option<Owned> {
     let key = search_key(query);
     // One letter starts the name of half the library.
     if key.chars().count() < 2 {
         return None;
     }
     let playlists = library.playlists.get().map_or(&[][..], Vec::as_slice);
+    let liked = gettext(locale, "Liked Songs");
     let find = |hit: &dyn Fn(&str) -> bool| {
         library
             .artists
@@ -570,6 +595,11 @@ fn library_pick(library: &crate::model::Library, query: &str) -> Option<Owned> {
                     .find(|album| hit(&album.name))
                     .cloned()
                     .map(Owned::Album)
+            })
+            .or_else(|| {
+                // As in Spotify, Liked Songs answers from three letters on.
+                (key.chars().count() >= 3 && (hit(&liked) || hit("Liked Songs")))
+                    .then_some(Owned::LikedSongs)
             })
             .or_else(|| {
                 playlists
@@ -950,12 +980,115 @@ fn playlist_card(app: &mut App, ui: &mut egui::Ui, playlist: &crate::api::models
         });
 }
 
+/// Liked Songs plays the account's collection; it has no URI of its own.
+fn liked_songs_uri(app: &App) -> Option<String> {
+    app.user
+        .as_ref()
+        .map(|user| format!("spotify:user:{}:collection", user.id))
+}
+
+fn liked_songs_subtitle(app: &App) -> String {
+    let owner = app
+        .user
+        .as_ref()
+        .map(|user| user.display_name.clone().unwrap_or_else(|| user.id.clone()))
+        .unwrap_or_default();
+    // Translators: {owner} is the name of the playlist's owner.
+    gettext(app.locale, "Playlist • {owner}")
+        .replace("{owner}", &owner)
+        .trim_end_matches([' ', '•'])
+        .to_string()
+}
+
+fn liked_songs_card(app: &mut App, ui: &mut egui::Ui) {
+    let playing_here = app.believed_playing()
+        && app
+            .playing_context_uri()
+            .is_some_and(|context| context.ends_with(":collection"));
+    let subtitle = liked_songs_subtitle(app);
+    let card = widgets::card(
+        ui,
+        app,
+        Some(LIKED_SONGS_KEY),
+        &gettext(app.locale, "Liked Songs"),
+        &subtitle,
+        widgets::CardCover::square(playing_here),
+    );
+    if card.play {
+        if playing_here {
+            app.actions.push(Action::TogglePlay);
+        } else if let Some(uri) = liked_songs_uri(app) {
+            app.actions.push(Action::PlayContext {
+                uri,
+                offset_uri: None,
+                offset_index: None,
+            });
+        }
+    }
+    if card.clicked {
+        app.actions.push(Action::Open(Page::LikedSongs));
+    }
+}
+
+/// The playlists Search shows. The Web API search never returns a private
+/// playlist or Liked Songs, so the listener's own whose names hold the
+/// search come first, then Spotify's results, each once. The place returned
+/// is where Liked Songs goes among them, when its name starts with the
+/// search: first from three letters on, as in Spotify, and after the
+/// listener's own playlists for two.
+fn playlists_shown(
+    app: &App,
+    results: &SearchResults,
+) -> (Option<usize>, Vec<crate::api::models::Playlist>) {
+    let key = search_key(&app.search.committed);
+    let letters = key.chars().count();
+    let mut shown = Vec::new();
+    let mut liked = None;
+    if letters >= 2 {
+        if let Some(playlists) = app.library.playlists.get() {
+            shown.extend(
+                playlists
+                    .iter()
+                    .filter(|playlist| search_key(&playlist.name).contains(&key))
+                    .cloned(),
+            );
+        }
+        let named = [gettext(app.locale, "Liked Songs").as_ref(), "Liked Songs"]
+            .iter()
+            .any(|name| search_key(name).starts_with(&key));
+        if named {
+            liked = Some(if letters >= 3 { 0 } else { shown.len() });
+        }
+    }
+    for playlist in results.playlists.iter().flat_map(|page| &page.items) {
+        if !shown.iter().any(|held| held.uri == playlist.uri) {
+            shown.push(playlist.clone());
+        }
+    }
+    (liked, shown)
+}
+
+/// Draws the playlist cards with Liked Songs at its place among them.
+fn playlist_cards(
+    app: &mut App,
+    ui: &mut egui::Ui,
+    liked: Option<usize>,
+    playlists: &[crate::api::models::Playlist],
+) {
+    for index in 0..=playlists.len() {
+        if liked == Some(index) {
+            liked_songs_card(app, ui);
+        }
+        if let Some(playlist) = playlists.get(index) {
+            playlist_card(app, ui, playlist);
+        }
+    }
+}
+
 fn shelf_playlists(app: &mut App, ui: &mut egui::Ui, results: &SearchResults) {
     let palette = app.palette;
-    let Some(page) = &results.playlists else {
-        return;
-    };
-    if page.items.is_empty() {
+    let (liked, playlists) = playlists_shown(app, results);
+    if liked.is_none() && playlists.is_empty() {
         return;
     }
     widgets::shelf(
@@ -963,23 +1096,13 @@ fn shelf_playlists(app: &mut App, ui: &mut egui::Ui, results: &SearchResults) {
         &palette,
         "search-playlists",
         &gettext(app.locale, "Playlists"),
-        |ui| {
-            for playlist in &page.items {
-                playlist_card(app, ui, playlist);
-            }
-        },
+        |ui| playlist_cards(app, ui, liked, &playlists),
     );
 }
 
 fn playlists_grid(app: &mut App, ui: &mut egui::Ui, results: &SearchResults) {
-    let Some(page) = &results.playlists else {
-        return;
-    };
-    widgets::grid(ui, |ui| {
-        for playlist in &page.items {
-            playlist_card(app, ui, playlist);
-        }
-    });
+    let (liked, playlists) = playlists_shown(app, results);
+    widgets::grid(ui, |ui| playlist_cards(app, ui, liked, &playlists));
 }
 
 fn show_card(app: &mut App, ui: &mut egui::Ui, show: &crate::api::models::Show) {
@@ -1092,6 +1215,7 @@ mod tests {
             Top::Song(track) => &track.name,
             Top::Playlist(playlist) => &playlist.name,
             Top::Podcast(show) => &show.name,
+            Top::LikedSongs => "Liked Songs",
         }
     }
 
@@ -1128,6 +1252,20 @@ mod tests {
         );
     }
 
+    /// As in Spotify, Liked Songs is the Top result from three letters on.
+    #[test]
+    fn liked_songs_is_the_top_result_from_three_letters() {
+        let library = crate::model::Library::default();
+        let top = |query: &str| {
+            library_pick(&library, crate::i18n::Locale::English, query)
+                .is_some_and(|owned| matches!(owned, Owned::LikedSongs))
+        };
+        assert!(!top("li"));
+        assert!(top("lik"));
+        assert!(top("Liked songs"));
+        assert!(!top("songs"), "only the start of its name counts");
+    }
+
     #[test]
     fn the_library_is_searched_by_the_start_of_a_name() {
         use crate::api::models::SavedAlbum;
@@ -1142,7 +1280,8 @@ mod tests {
             });
         }
         let found = |query: &str| {
-            library_pick(&library, query).map(|owned| name(Some(owned.top())).to_string())
+            library_pick(&library, crate::i18n::Locale::English, query)
+                .map(|owned| name(Some(owned.top())).to_string())
         };
         assert_eq!(found("fire").as_deref(), Some("Firewater"));
         assert_eq!(

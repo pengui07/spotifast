@@ -145,6 +145,17 @@ Library sidebar to start playing it. A single click still opens the row's page.
 Pointing at a row's cover art also shows a play button, but only when the
 sidebar is not in compact mode.
 
+## Search results
+
+Spotify's search does not personalise its answers, so Spotifast adds your
+library. The Top result is something you follow or saved whose name starts
+with what you typed, when there is one, and otherwise a saved result near the
+top of its list, a name matching the search exactly, or the first song.
+Playlists lists your own playlists whose names hold the search first,
+including private ones Spotify's search never returns, and Liked Songs once
+you type the start of its name (first, and as Top result, from three
+letters).
+
 ## Recent searches
 
 With the search box empty, Search lists what you opened or played from
