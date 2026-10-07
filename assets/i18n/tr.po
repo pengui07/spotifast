@@ -363,8 +363,8 @@ msgstr "Tam ekran şarkı sözleri"
 
 #: src/ui/lyrics.rs:102 src/ui/lyrics.rs:546
 msgctxt "lyrics"
-msgid "Follow"
-msgstr "Takip et"
+msgid "Sync"
+msgstr "Eşitle"
 
 #: src/ui/lyrics.rs:132 src/ui/lyrics.rs:601
 msgid "Play a song to see its lyrics."

@@ -359,8 +359,8 @@ msgstr "歌詞を全画面表示"
 
 #: src/ui/lyrics.rs:102 src/ui/lyrics.rs:546
 msgctxt "lyrics"
-msgid "Follow"
-msgstr "追従"
+msgid "Sync"
+msgstr "同期"
 
 #: src/ui/lyrics.rs:132 src/ui/lyrics.rs:601
 msgid "Play a song to see its lyrics."

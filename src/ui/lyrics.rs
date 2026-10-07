@@ -123,7 +123,7 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
                     && theme::pill_button(
                         ui,
                         &palette,
-                        &pgettext(app.locale, "lyrics", "Follow"),
+                        &pgettext(app.locale, "lyrics", "Sync"),
                         false,
                     )
                     .clicked()
@@ -805,13 +805,8 @@ fn fullscreen_header(app: &mut App, ui: &mut egui::Ui) {
             if !app.fullscreen_cover
                 && loaded
                 && !app.lyrics_following
-                && theme::pill_button(
-                    ui,
-                    &palette,
-                    &pgettext(app.locale, "lyrics", "Follow"),
-                    false,
-                )
-                .clicked()
+                && theme::pill_button(ui, &palette, &pgettext(app.locale, "lyrics", "Sync"), false)
+                    .clicked()
             {
                 app.actions.push(Action::FollowLyrics);
             }

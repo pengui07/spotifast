@@ -1787,8 +1787,7 @@ mod tests {
             app.lyrics_following = false;
             accessible_frame(&ctx, &mut app, vec![]);
             let tree = accessible_frame(&ctx, &mut app, vec![]);
-            let follow =
-                accessible_node(&tree, &pgettext(locale, "lyrics", "Follow"), Role::Button);
+            let follow = accessible_node(&tree, &pgettext(locale, "lyrics", "Sync"), Role::Button);
             accessible_frame(
                 &ctx,
                 &mut app,
@@ -1806,8 +1805,7 @@ mod tests {
             assert!(app.lyrics_fullscreen.is_some());
             app.lyrics_following = false;
             let tree = accessible_frame(&ctx, &mut app, vec![]);
-            let follow =
-                accessible_node(&tree, &pgettext(locale, "lyrics", "Follow"), Role::Button);
+            let follow = accessible_node(&tree, &pgettext(locale, "lyrics", "Sync"), Role::Button);
             accessible_frame(
                 &ctx,
                 &mut app,
@@ -5878,7 +5876,7 @@ mod tests {
                 assert_same_row(&placed, "Queue", "Recent");
             }
             if lyrics {
-                assert_same_row(&placed, "Lyrics", "Follow");
+                assert_same_row(&placed, "Lyrics", "Sync");
             }
         }
         app.backend.shutdown();

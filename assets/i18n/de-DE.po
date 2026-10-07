@@ -363,8 +363,8 @@ msgstr "Songtext im Vollbild"
 
 #: src/ui/lyrics.rs:102 src/ui/lyrics.rs:546
 msgctxt "lyrics"
-msgid "Follow"
-msgstr "Folgen"
+msgid "Sync"
+msgstr "Synchronisieren"
 
 #: src/ui/lyrics.rs:132 src/ui/lyrics.rs:601
 msgid "Play a song to see its lyrics."
