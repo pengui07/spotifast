@@ -264,6 +264,8 @@ pub struct Settings {
     pub accent_from_art: bool,
     /// A spectrum or waveform of the playing song behind the player bar.
     pub player_bar_vis: PlayerBarVis,
+    /// A click on the player bar's empty space moves to the next visualizer.
+    pub player_bar_vis_click: bool,
     /// Last local volume, 0..=65535.
     pub volume: u16,
     /// Whether the library sidebar is visible.
@@ -432,6 +434,7 @@ impl Default for Settings {
             home: HomeSettings::default(),
             accent_from_art: true,
             player_bar_vis: PlayerBarVis::Off,
+            player_bar_vis_click: true,
             volume: (u16::MAX as u32 * 70 / 100) as u16,
             sidebar_visible: true,
             art_expanded: false,
