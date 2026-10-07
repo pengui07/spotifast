@@ -279,15 +279,7 @@ fn recent_row(app: &mut App, ui: &mut egui::Ui, entry: &RecentSearch, width: f32
 fn all(app: &mut App, ui: &mut egui::Ui, results: &SearchResults) {
     let palette = app.palette;
     let locale = app.locale;
-    let query = app.search.committed.to_lowercase();
-    let top_artist = results
-        .artists
-        .as_ref()
-        .and_then(|page| page.items.first())
-        .filter(|artist| {
-            artist.name.to_lowercase() == query
-                || results.tracks.as_ref().is_none_or(|t| t.items.is_empty())
-        });
+    let top = top_pick(results, &app.search.committed);
     let wide = ui.available_width() > 720.0;
     ui.horizontal_top(|ui| {
         ui.spacing_mut().item_spacing.x = 24.0;
@@ -300,7 +292,7 @@ fn all(app: &mut App, ui: &mut egui::Ui, results: &SearchResults) {
             ui.set_width(top_width);
             theme::section_title(ui, &palette, &gettext(locale, "Top result"));
             ui.add_space(4.0);
-            if let Some(artist) = top_artist {
+            if let Some(Top::Artist(artist)) = top {
                 top_result(
                     app,
                     ui,
@@ -314,8 +306,7 @@ fn all(app: &mut App, ui: &mut egui::Ui, results: &SearchResults) {
                         widgets::context_menu_items(ui, app, &artist.uri, &artist.name, None);
                     },
                 );
-            } else if let Some(track) = results.tracks.as_ref().and_then(|page| page.items.first())
-            {
+            } else if let Some(Top::Song(track)) = top {
                 let page = track
                     .album
                     .as_ref()
@@ -340,8 +331,7 @@ fn all(app: &mut App, ui: &mut egui::Ui, results: &SearchResults) {
                         );
                     },
                 );
-            } else if let Some(album) = results.albums.as_ref().and_then(|page| page.items.first())
-            {
+            } else if let Some(Top::Album(album)) = top {
                 top_result(
                     app,
                     ui,
@@ -363,11 +353,7 @@ fn all(app: &mut App, ui: &mut egui::Ui, results: &SearchResults) {
                         widgets::context_menu_items(ui, app, &album.uri, &album.name, None);
                     },
                 );
-            } else if let Some(playlist) = results
-                .playlists
-                .as_ref()
-                .and_then(|page| page.items.first())
-            {
+            } else if let Some(Top::Playlist(playlist)) = top {
                 top_result(
                     app,
                     ui,
@@ -392,7 +378,7 @@ fn all(app: &mut App, ui: &mut egui::Ui, results: &SearchResults) {
                         );
                     },
                 );
-            } else if let Some(show) = results.shows.as_ref().and_then(|page| page.items.first()) {
+            } else if let Some(Top::Podcast(show)) = top {
                 top_result(
                     app,
                     ui,
@@ -437,6 +423,71 @@ fn all(app: &mut App, ui: &mut egui::Ui, results: &SearchResults) {
         ui.add_space(4.0);
         episodes(app, ui, results, 4);
     }
+}
+
+/// What the Top result card shows.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Top<'a> {
+    Artist(&'a Artist),
+    Album(&'a crate::api::models::Album),
+    Song(&'a crate::api::models::Track),
+    Playlist(&'a crate::api::models::Playlist),
+    Podcast(&'a crate::api::models::Show),
+}
+
+/// A name reduced to its letters and digits, so "Keep It Like a Secret"
+/// and "keep it like a secret!" compare equal.
+fn search_key(text: &str) -> String {
+    text.chars()
+        .filter(|c| c.is_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
+/// Spotify answers each kind in its own list, with no best match across
+/// them, so the Top result is chosen here. A name that is exactly what was
+/// searched wins, an artist before an album before a song, as Spotify
+/// ranks them; otherwise the first song, or the first of whatever came back.
+fn top_pick<'a>(results: &'a SearchResults, query: &str) -> Option<Top<'a>> {
+    fn items<T>(page: &Option<crate::api::models::Page<T>>) -> &[T] {
+        page.as_ref().map_or(&[], |page| page.items.as_slice())
+    }
+    let key = search_key(query);
+    let named = |name: &str| !key.is_empty() && search_key(name) == key;
+    let exact = items(&results.artists)
+        .iter()
+        .find(|artist| named(&artist.name))
+        .map(Top::Artist)
+        .or_else(|| {
+            items(&results.albums)
+                .iter()
+                .find(|album| named(&album.name))
+                .map(Top::Album)
+        })
+        .or_else(|| {
+            items(&results.tracks)
+                .iter()
+                .find(|track| named(&track.name))
+                .map(Top::Song)
+        })
+        .or_else(|| {
+            items(&results.playlists)
+                .iter()
+                .find(|playlist| named(&playlist.name))
+                .map(Top::Playlist)
+        })
+        .or_else(|| {
+            items(&results.shows)
+                .iter()
+                .find(|show| named(&show.name))
+                .map(Top::Podcast)
+        });
+    exact
+        .or_else(|| items(&results.tracks).first().map(Top::Song))
+        .or_else(|| items(&results.artists).first().map(Top::Artist))
+        .or_else(|| items(&results.albums).first().map(Top::Album))
+        .or_else(|| items(&results.playlists).first().map(Top::Playlist))
+        .or_else(|| items(&results.shows).first().map(Top::Podcast))
 }
 
 enum TopResultSubtitle<'a> {
@@ -888,4 +939,77 @@ fn episodes(app: &mut App, ui: &mut egui::Ui, results: &SearchResults, limit: us
 #[allow(dead_code)]
 fn align_right(ui: &mut egui::Ui, add: impl FnOnce(&mut egui::Ui)) {
     ui.with_layout(Layout::right_to_left(Align::Center), add);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::api::models::{Album, Page as Results, Track};
+
+    fn results() -> SearchResults {
+        let track = |name: &str| Track {
+            name: name.into(),
+            ..Track::default()
+        };
+        let artist = |name: &str| Artist {
+            name: name.into(),
+            ..Artist::default()
+        };
+        SearchResults {
+            tracks: Some(Results {
+                items: vec![track("Broken Chairs"), track("Carry the Zero")],
+                ..Default::default()
+            }),
+            artists: Some(Results {
+                items: vec![artist("keepsecrets"), artist("Built to Spill")],
+                ..Default::default()
+            }),
+            albums: Some(Results {
+                items: vec![
+                    Album {
+                        name: "There's Nothing Wrong with Love".into(),
+                        ..Album::default()
+                    },
+                    Album {
+                        name: "Keep It Like a Secret".into(),
+                        ..Album::default()
+                    },
+                ],
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+    }
+
+    fn name(top: Option<Top<'_>>) -> &str {
+        match top.expect("a top result") {
+            Top::Artist(artist) => &artist.name,
+            Top::Album(album) => &album.name,
+            Top::Song(track) => &track.name,
+            Top::Playlist(playlist) => &playlist.name,
+            Top::Podcast(show) => &show.name,
+        }
+    }
+
+    #[test]
+    fn a_result_named_as_searched_is_the_top_result_whatever_its_kind() {
+        let results = results();
+        assert_eq!(
+            name(top_pick(&results, "keep it like a secret")),
+            "Keep It Like a Secret"
+        );
+        assert_eq!(
+            name(top_pick(&results, "Built To Spill!")),
+            "Built to Spill"
+        );
+        assert_eq!(name(top_pick(&results, "carry the zero")), "Carry the Zero");
+    }
+
+    #[test]
+    fn without_a_matching_name_the_first_song_is_the_top_result() {
+        let mut results = results();
+        assert_eq!(name(top_pick(&results, "keep")), "Broken Chairs");
+        results.tracks = None;
+        assert_eq!(name(top_pick(&results, "keep")), "keepsecrets");
+    }
 }
