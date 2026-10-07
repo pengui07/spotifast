@@ -10291,10 +10291,7 @@ pub(crate) fn recent_search_from(
     use crate::api::models::{join_names, pick_image};
     use crate::settings::RecentSearch;
     const COVER: u32 = 160;
-    fn find<T>(
-        page: &Option<crate::api::models::Page<T>>,
-        hit: impl Fn(&T) -> bool,
-    ) -> Option<&T> {
+    fn find<T>(page: &Option<crate::api::models::Page<T>>, hit: impl Fn(&T) -> bool) -> Option<&T> {
         page.as_ref()?.items.iter().find(|item| hit(item))
     }
     let entry = |name: &str, detail: String, image: Option<&str>| RecentSearch {
