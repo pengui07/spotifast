@@ -852,6 +852,7 @@ fn shelf_artists(app: &mut App, ui: &mut egui::Ui, results: &SearchResults) {
     widgets::shelf(
         ui,
         &palette,
+        app.settings.faithful_visuals,
         "search-artists",
         &gettext(app.locale, "Artists"),
         |ui| {
@@ -919,6 +920,7 @@ fn shelf_albums(app: &mut App, ui: &mut egui::Ui, results: &SearchResults) {
     widgets::shelf(
         ui,
         &palette,
+        app.settings.faithful_visuals,
         "search-albums",
         &gettext(app.locale, "Albums"),
         |ui| {
@@ -1094,6 +1096,7 @@ fn shelf_playlists(app: &mut App, ui: &mut egui::Ui, results: &SearchResults) {
     widgets::shelf(
         ui,
         &palette,
+        app.settings.faithful_visuals,
         "search-playlists",
         &gettext(app.locale, "Playlists"),
         |ui| playlist_cards(app, ui, liked, &playlists),
@@ -1134,6 +1137,7 @@ fn shelf_shows(app: &mut App, ui: &mut egui::Ui, results: &SearchResults) {
     widgets::shelf(
         ui,
         &palette,
+        app.settings.faithful_visuals,
         "search-shows",
         &gettext(app.locale, "Podcasts"),
         |ui| {

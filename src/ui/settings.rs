@@ -806,6 +806,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     let custom_titlebar = gettext(locale, "Custom title bar");
     let player_bar_vis = gettext(locale, "Player bar visualizer");
     let player_bar_vis_click = gettext(locale, "Click to change visualizer");
+    let faithful_visuals = gettext(locale, "Faithful visuals");
     let appearance_rows = [
         RowText::new(theme_title.clone(), {
             let detail = theme::catalog_detail(
@@ -889,6 +890,8 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 locale,
                 "Clicking the player bar's empty space switches between Off, Spectrum and Waveform.",
             ),
+            faithful_visuals.clone(),
+            gettext(locale, "Use Spotify-style panels, navigation, and playback controls. Adds Now Playing view."),
         ),
     ];
     if section_matches(&needle, &appearance, &appearance_rows) {
@@ -1197,6 +1200,28 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     },
                 );
             }
+            filtered_row(
+                ui,
+                &palette,
+                &needle,
+                &appearance,
+                &appearance_rows[10],
+                |ui| {
+                    if widgets::switch(
+                        ui,
+                        &palette,
+                        &faithful_visuals,
+                        &mut app.settings.faithful_visuals,
+                    )
+                    .changed()
+                    {
+                        if app.settings.faithful_visuals {
+                            app.actions.push(crate::model::Action::RefreshQueue);
+                        }
+                        changed = true;
+                    }
+                },
+            );
         });
     }
 

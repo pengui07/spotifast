@@ -295,6 +295,8 @@ pub struct Settings {
     /// The MilkDrop visualiser can be opened. Off removes its button from
     /// the top bar and makes its shortcut do nothing.
     pub milkdrop_enabled: bool,
+    /// Spotify-style shell, neutral surfaces, and controls.
+    pub faithful_visuals: bool,
     /// Last local volume, 0..=65535.
     pub volume: u16,
     /// Whether the library sidebar is visible.
@@ -470,6 +472,7 @@ impl Default for Settings {
             player_bar_vis_click: true,
             winamp_enabled: true,
             milkdrop_enabled: true,
+            faithful_visuals: false,
             volume: (u16::MAX as u32 * 70 / 100) as u16,
             sidebar_visible: true,
             art_expanded: false,
@@ -1243,6 +1246,20 @@ mod tests {
         assert_eq!(PlayerBarVis::Off.next(), PlayerBarVis::Spectrum);
         assert_eq!(PlayerBarVis::Spectrum.next(), PlayerBarVis::Waveform);
         assert_eq!(PlayerBarVis::Waveform.next(), PlayerBarVis::Off);
+    }
+
+    #[test]
+    fn faithful_visuals_is_opt_in_and_persists() {
+        let original: Settings = serde_json::from_str("{}").unwrap();
+        assert!(!original.faithful_visuals);
+        let chosen = Settings {
+            faithful_visuals: true,
+            ..Settings::default()
+        };
+        let restored: Settings =
+            serde_json::from_str(&serde_json::to_string(&chosen).unwrap()).unwrap();
+        assert!(restored.faithful_visuals);
+        assert_eq!(restored.theme, original.theme);
     }
 
     #[test]
