@@ -8288,6 +8288,21 @@ impl App {
     }
 
     pub(crate) fn apply(&mut self, action: Action, ctx: &egui::Context) {
+        // Turned off in Settings, Winamp and MilkDrop only ever close, from
+        // any button, shortcut or menu that would open them.
+        match action {
+            Action::ToggleWinampWindow
+                if !self.settings.winamp_enabled && !self.settings.winamp_window =>
+            {
+                return;
+            }
+            Action::ToggleWinampMilkdrop
+                if !self.settings.milkdrop_enabled && !self.settings.milkdrop_open =>
+            {
+                return;
+            }
+            _ => {}
+        }
         if matches!(
             &action,
             Action::Open(_)
@@ -17138,6 +17153,27 @@ mod tests {
                 .collect();
             assert_eq!(commands, vec![true, was_fullscreen]);
         }
+    }
+
+    #[test]
+    fn winamp_and_milkdrop_turned_off_never_open_but_still_close() {
+        let mut app = headless_app();
+        let ctx = egui::Context::default();
+        let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
+            app.settings.winamp_enabled = false;
+            app.settings.milkdrop_enabled = false;
+            app.apply(Action::ToggleWinampWindow, ui.ctx());
+            assert!(!app.settings.winamp_window);
+            app.apply(Action::ToggleWinampMilkdrop, ui.ctx());
+            assert!(!app.settings.milkdrop_open);
+
+            // Already open, from before they were turned off, they close.
+            app.settings.milkdrop_open = true;
+            app.apply(Action::ToggleWinampMilkdrop, ui.ctx());
+            assert!(!app.settings.milkdrop_open);
+        });
+        output.textures_delta.clear();
+        app.backend.shutdown();
     }
 
     #[test]

@@ -1297,6 +1297,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     let skins = gettext(locale, "Winamp skins");
     let always_on_top = gettext(locale, "Always on top");
     let show_in_taskbar = gettext(locale, "Show Winamp in taskbar");
+    let winamp_enabled = gettext(locale, "Winamp mini player");
     let skins_rows = [
         RowText::new(
             gettext(locale, "Mini player"),
@@ -1350,13 +1351,33 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 .collect::<Vec<_>>()
                 .join(" "),
         ),
+        RowText::new(
+            winamp_enabled.clone(),
+            gettext(
+                locale,
+                "Turn off to remove its button from the top bar and its shortcut.",
+            ),
+        ),
     ];
     if section_matches(&needle, &skins, &skins_rows) {
         any_visible = true;
         section(ui, &palette, &skins, |ui| {
+            filtered_row(ui, &palette, &needle, &skins, &skins_rows[6], |ui| {
+                if widgets::switch(
+                    ui,
+                    &palette,
+                    &winamp_enabled,
+                    &mut app.settings.winamp_enabled,
+                )
+                .changed()
+                {
+                    app.mark_settings_dirty();
+                }
+            });
             filtered_row(ui, &palette, &needle, &skins, &skins_rows[0], |ui| {
-                if theme::pill_button(ui, &palette, &gettext(locale, "Switch to it"), true)
-                    .clicked()
+                if app.settings.winamp_enabled
+                    && theme::pill_button(ui, &palette, &gettext(locale, "Switch to it"), true)
+                        .clicked()
                 {
                     app.actions.push(Action::ToggleWinampWindow);
                 }
@@ -1488,6 +1509,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     let count = app.winamp.presets.count();
     let screen_hz = app.settings.milkdrop_screen_hz;
     let milkdrop_window = gettext(locale, "MilkDrop window");
+    let milkdrop_enabled = gettext(locale, "MilkDrop visualiser");
     let folder = presets_folder.display().to_string();
     let milkdrop_rows = [
         RowText::new(
@@ -1573,13 +1595,38 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 .collect::<Vec<_>>()
                 .join(" "),
         ),
+        RowText::new(
+            milkdrop_enabled.clone(),
+            gettext(
+                locale,
+                "Turn off to remove its button from the top bar and its shortcut.",
+            ),
+        ),
     ];
     if section_matches(&needle, "MilkDrop", &milkdrop_rows) {
         any_visible = true;
         section(ui, &palette, "MilkDrop", |ui| {
+            filtered_row(ui, &palette, &needle, "MilkDrop", &milkdrop_rows[6], |ui| {
+                if widgets::switch(
+                    ui,
+                    &palette,
+                    &milkdrop_enabled,
+                    &mut app.settings.milkdrop_enabled,
+                )
+                .changed()
+                {
+                    // Turned off while open, its window closes.
+                    if !app.settings.milkdrop_enabled && app.settings.milkdrop_open {
+                        app.actions.push(Action::ToggleWinampMilkdrop);
+                    }
+                    app.mark_settings_dirty();
+                }
+            });
             filtered_row(ui, &palette, &needle, "MilkDrop", &milkdrop_rows[0], |ui| {
                 let mut open = app.settings.milkdrop_open;
-                if widgets::switch(ui, &palette, &milkdrop_window, &mut open).changed() {
+                if app.settings.milkdrop_enabled
+                    && widgets::switch(ui, &palette, &milkdrop_window, &mut open).changed()
+                {
                     app.actions.push(Action::ToggleWinampMilkdrop);
                 }
             });

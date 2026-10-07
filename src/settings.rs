@@ -266,6 +266,12 @@ pub struct Settings {
     pub player_bar_vis: PlayerBarVis,
     /// A click on the player bar's empty space moves to the next visualizer.
     pub player_bar_vis_click: bool,
+    /// The Winamp mini player can be opened. Off removes its button from
+    /// the top bar and makes its shortcut do nothing.
+    pub winamp_enabled: bool,
+    /// The MilkDrop visualiser can be opened. Off removes its button from
+    /// the top bar and makes its shortcut do nothing.
+    pub milkdrop_enabled: bool,
     /// Last local volume, 0..=65535.
     pub volume: u16,
     /// Whether the library sidebar is visible.
@@ -435,6 +441,8 @@ impl Default for Settings {
             accent_from_art: true,
             player_bar_vis: PlayerBarVis::Off,
             player_bar_vis_click: true,
+            winamp_enabled: true,
+            milkdrop_enabled: true,
             volume: (u16::MAX as u32 * 70 / 100) as u16,
             sidebar_visible: true,
             art_expanded: false,
