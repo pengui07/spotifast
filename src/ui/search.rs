@@ -279,8 +279,11 @@ fn recent_row(app: &mut App, ui: &mut egui::Ui, entry: &RecentSearch, width: f32
 fn all(app: &mut App, ui: &mut egui::Ui, results: &SearchResults) {
     let palette = app.palette;
     let locale = app.locale;
-    let top = top_pick(results, &app.search.committed, |uri| {
-        app.is_saved(uri) == Some(true)
+    let owned = library_pick(&app.library, &app.search.committed);
+    let top = owned.as_ref().map(Owned::top).or_else(|| {
+        top_pick(results, &app.search.committed, |uri| {
+            app.is_saved(uri) == Some(true)
+        })
     });
     let wide = ui.available_width() > 720.0;
     ui.horizontal_top(|ui| {
@@ -517,6 +520,77 @@ fn fallback_top(results: &SearchResults) -> Option<Top<'_>> {
         .and_then(|page| page.items.first())
         .map(Top::Song)
         .or_else(|| first_top(results, 1, |_, _| true))
+}
+
+/// Something from the listener's library, which a search may not return.
+enum Owned {
+    Artist(Artist),
+    Album(crate::api::models::Album),
+    Playlist(crate::api::models::Playlist),
+    Podcast(crate::api::models::Show),
+}
+
+impl Owned {
+    fn top(&self) -> Top<'_> {
+        match self {
+            Self::Artist(artist) => Top::Artist(artist),
+            Self::Album(album) => Top::Album(album),
+            Self::Playlist(playlist) => Top::Playlist(playlist),
+            Self::Podcast(show) => Top::Podcast(show),
+        }
+    }
+}
+
+/// Spotify's own app looks in the listener's library as they type: "dia"
+/// finds a saved album called Diary that the Web API search leaves out, and
+/// "fire" finds a saved Firewater even when the search returns another
+/// release of it. A followed artist, then a saved album, playlist or
+/// podcast whose name is what was typed, or else starts with it, wins.
+fn library_pick(library: &crate::model::Library, query: &str) -> Option<Owned> {
+    let key = search_key(query);
+    // One letter starts the name of half the library.
+    if key.chars().count() < 2 {
+        return None;
+    }
+    let playlists = library.playlists.get().map_or(&[][..], Vec::as_slice);
+    let find = |hit: &dyn Fn(&str) -> bool| {
+        library
+            .artists
+            .items
+            .iter()
+            .find(|artist| hit(&artist.name))
+            .cloned()
+            .map(Owned::Artist)
+            .or_else(|| {
+                library
+                    .albums
+                    .items
+                    .iter()
+                    .map(|saved| &saved.album)
+                    .find(|album| hit(&album.name))
+                    .cloned()
+                    .map(Owned::Album)
+            })
+            .or_else(|| {
+                playlists
+                    .iter()
+                    .find(|playlist| hit(&playlist.name))
+                    .cloned()
+                    .map(Owned::Playlist)
+            })
+            .or_else(|| {
+                library
+                    .shows
+                    .items
+                    .iter()
+                    .map(|saved| &saved.show)
+                    .find(|show| hit(&show.name))
+                    .cloned()
+                    .map(Owned::Podcast)
+            })
+    };
+    find(&|name| search_key(name) == key)
+        .or_else(|| find(&|name| search_key(name).starts_with(&key)))
 }
 
 enum TopResultSubtitle<'a> {
@@ -1052,6 +1126,33 @@ mod tests {
             name(top_pick(&results, "keepsecrets", |_| false)),
             "keepsecrets"
         );
+    }
+
+    #[test]
+    fn the_library_is_searched_by_the_start_of_a_name() {
+        use crate::api::models::SavedAlbum;
+        let mut library = crate::model::Library::default();
+        for name in ["Firewater", "Diary (Remastered and Expanded)", "Dia"] {
+            library.albums.items.push(SavedAlbum {
+                added_at: None,
+                album: Album {
+                    name: name.into(),
+                    ..Album::default()
+                },
+            });
+        }
+        let found = |query: &str| {
+            library_pick(&library, query).map(|owned| name(Some(owned.top())).to_string())
+        };
+        assert_eq!(found("fire").as_deref(), Some("Firewater"));
+        assert_eq!(
+            found("diar").as_deref(),
+            Some("Diary (Remastered and Expanded)")
+        );
+        // A name that is exactly the search beats one that only starts with it.
+        assert_eq!(found("dia").as_deref(), Some("Dia"));
+        assert_eq!(found("f"), None, "one letter is not enough");
+        assert_eq!(found("water"), None, "only the start of a name counts");
     }
 
     #[test]

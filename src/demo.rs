@@ -5197,6 +5197,9 @@ mod tests {
                 name: "Ween".into(),
                 uri: artist_id.map(|id| format!("spotify:artist:{id}")),
             }];
+            // Nothing in the demo library is named like this search, so the
+            // song stays the Top result.
+            app.search.committed = "Ween".into();
             app.search.results = Loadable::Loaded(SearchResults {
                 tracks: Some(page(vec![item])),
                 ..Default::default()
