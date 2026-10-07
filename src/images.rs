@@ -449,7 +449,7 @@ pub struct LyricsBackdrop {
     uri: Option<String>,
     requested: bool,
     retry_at: Option<Instant>,
-    pending: Option<std::sync::mpsc::Receiver<Result<Option<egui::ColorImage>, String>>>,
+    pending: Option<std::sync::mpsc::Receiver<Result<egui::ColorImage, String>>>,
     texture: Option<egui::TextureHandle>,
 }
 
@@ -494,7 +494,10 @@ impl LyricsBackdrop {
                         .runtime
                         .spawn_blocking(move || blurred_background(&bytes, LYRICS_BLUR))
                         .await
-                        .map_err(|error| error.to_string()),
+                        .map_err(|error| error.to_string())
+                        .and_then(|image| {
+                            image.ok_or_else(|| "artwork could not be decoded".to_string())
+                        }),
                     Err(error) => Err(error),
                 };
                 let _ = tx.send(result);
@@ -504,12 +507,24 @@ impl LyricsBackdrop {
         if let Some(receiver) = &self.pending {
             match receiver.try_recv() {
                 Ok(Ok(image)) => {
-                    self.texture = image.map(|image| {
-                        ctx.load_texture("lyrics-backdrop", image, egui::TextureOptions::LINEAR)
-                    });
+                    self.texture = Some(ctx.load_texture(
+                        "lyrics-backdrop",
+                        image,
+                        egui::TextureOptions::LINEAR,
+                    ));
                     self.pending = None;
                 }
-                Ok(Err(_)) | Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                // Artwork that could not be fetched or decoded is asked for
+                // again, keeping the backdrop on show meanwhile: settling
+                // for none left the view black until the song changed.
+                Ok(Err(error)) => {
+                    log::debug!("backdrop artwork unavailable: {error}");
+                    self.pending = None;
+                    self.requested = false;
+                    self.retry_at = Some(Instant::now() + BACKDROP_RETRY);
+                    ctx.request_repaint_after(BACKDROP_RETRY);
+                }
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
                     self.pending = None;
                     self.requested = false;
                     self.retry_at = Some(Instant::now() + BACKDROP_RETRY);
@@ -891,6 +906,66 @@ mod tests {
             Some(uri),
             || loader.release_bytes(uri),
             |texture| texture.is_some(),
+        );
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// Artwork that arrives but cannot be decoded keeps the backdrop on show
+    /// and is asked for again, rather than leaving the view black until the
+    /// song changes.
+    #[test]
+    fn lyrics_backdrop_retries_artwork_it_could_not_decode() {
+        let runtime = artwork_test_runtime();
+        let dir =
+            std::env::temp_dir().join(format!("spotifast-backdrop-decode-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let loader = artwork_test_loader(&runtime, dir.clone());
+        let ctx = egui::Context::default();
+        let first = "https://i.scdn.co/image/decodes";
+        let second = "https://i.scdn.co/image/broken";
+        cached_png(&loader, first, [200, 40, 40]);
+        std::fs::write(loader.inner.cache_path(second), b"not an image").unwrap();
+        let mut backdrop = LyricsBackdrop::default();
+        backdrop_frames(
+            &runtime,
+            &mut backdrop,
+            &ctx,
+            &loader,
+            Some(first),
+            || {},
+            |t| t.is_some(),
+        );
+        let shown = backdrop.texture.as_ref().unwrap().id();
+
+        // The broken artwork fails, and the previous backdrop stays.
+        runtime.block_on(async {
+            tokio::time::timeout(Duration::from_secs(10), async {
+                loop {
+                    let held = backdrop
+                        .texture(&ctx, &loader, Some(second))
+                        .map(|t| t.id());
+                    assert_eq!(held, Some(shown));
+                    if backdrop.retry_at.is_some() && !backdrop.requested {
+                        break;
+                    }
+                    tokio::time::sleep(Duration::from_millis(1)).await;
+                }
+            })
+            .await
+            .expect("the broken artwork fails");
+        });
+
+        // Once the artwork decodes, the retry shows it.
+        cached_png(&loader, second, [40, 40, 200]);
+        backdrop.retry_at = Some(Instant::now());
+        backdrop_frames(
+            &runtime,
+            &mut backdrop,
+            &ctx,
+            &loader,
+            Some(second),
+            || {},
+            |t| t.is_some_and(|t| t.id() != shown),
         );
         std::fs::remove_dir_all(dir).unwrap();
     }
