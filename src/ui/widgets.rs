@@ -2394,7 +2394,13 @@ pub fn card(
             Align::Center => pos2(title_rect.center().x, title_rect.top()),
             _ => title_rect.min,
         };
-        ui.painter().galley(title_pos, title_galley, palette.text);
+        // What plays is named in the accent, as in the library sidebar.
+        let title_color = if playing && playable {
+            palette.accent
+        } else {
+            palette.text
+        };
+        ui.painter().galley(title_pos, title_galley, title_color);
         let subtitle_galley = ellipsized(
             ui,
             subtitle,
@@ -2439,6 +2445,16 @@ pub fn card(
                 &gettext(app.locale, if playing { "Pause" } else { "Play" }),
             )
             .clicked();
+        } else if playable && playing {
+            // As in Spotify, what plays keeps its control showing: here the
+            // moving bars, in the same circle where hover shows Pause.
+            let badge = Rect::from_center_size(
+                pos2(image_rect.right() - 26.0, image_rect.bottom() - 26.0),
+                Vec2::splat(44.0),
+            );
+            ui.painter()
+                .circle_filled(badge.center(), 22.0, palette.accent);
+            theme::paint_playing_bars(ui, badge, 20.0, palette.on_accent);
         }
     }
     crate::autoscroll::row(ui, &response);

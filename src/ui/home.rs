@@ -114,7 +114,19 @@ fn quick_access(app: &mut App, ui: &mut egui::Ui) {
                             Some(app.backend.art()),
                         );
                     }
-                    let play_room = if hovered && uri.is_some() { 52.0 } else { 12.0 };
+                    // Like Spotify's shortcuts, the one playing shows moving
+                    // bars at its end until hovered for its pause button.
+                    let playing_here = uri
+                        .as_deref()
+                        .is_some_and(|uri| app.playing_context_uri().as_deref() == Some(uri))
+                        && app.believed_playing();
+                    let play_room = if hovered && uri.is_some() {
+                        52.0
+                    } else if playing_here {
+                        40.0
+                    } else {
+                        12.0
+                    };
                     let text_rect = Rect::from_min_max(
                         pos2(cover.right() + 12.0, rect.top()),
                         pos2(rect.right() - play_room, rect.bottom()),
@@ -128,10 +140,18 @@ fn quick_access(app: &mut App, ui: &mut egui::Ui) {
                         theme::bold(14.5),
                         palette.text,
                     );
+                    if playing_here && !hovered {
+                        theme::paint_playing_bars(
+                            ui,
+                            Rect::from_center_size(
+                                pos2(rect.right() - 24.0, rect.center().y),
+                                Vec2::splat(18.0),
+                            ),
+                            18.0,
+                            palette.accent,
+                        );
+                    }
                     if hovered && let Some(uri) = uri {
-                        let playing_here = app.playing_context_uri().as_deref()
-                            == Some(uri.as_str())
-                            && app.believed_playing();
                         let button = Rect::from_center_size(
                             pos2(rect.right() - 28.0, rect.center().y),
                             Vec2::splat(40.0),
@@ -331,19 +351,25 @@ fn recently_played(app: &mut App, ui: &mut egui::Ui) {
         |ui| {
             for entry in &tracks {
                 let track = &entry.track;
+                let playing_here = app.current_track_uri().as_deref() == Some(track.uri.as_str())
+                    && app.believed_playing();
                 let card = widgets::card(
                     ui,
                     app,
                     track.image(640),
                     &track.name,
                     &track.artist_names(),
-                    widgets::CardCover::square(false),
+                    widgets::CardCover::square(playing_here),
                 );
                 if card.play {
-                    app.actions.push(Action::PlayUris {
-                        uris: vec![track.uri.clone()],
-                        index: 0,
-                    });
+                    if playing_here {
+                        app.actions.push(Action::TogglePlay);
+                    } else {
+                        app.actions.push(Action::PlayUris {
+                            uris: vec![track.uri.clone()],
+                            index: 0,
+                        });
+                    }
                 }
                 if card.clicked
                     && let Some(album) = &track.album
