@@ -42,14 +42,35 @@ fn glew_library(lib: &std::path::Path) -> Option<&'static str> {
         .find(|name| present.iter().any(|found| found == name))
 }
 
+/// A personal build may wear its own icon: `local/app-icon.png` for the
+/// window, the tray and the logo in the app, and `local/app-icon.ico` for the
+/// Windows executable. `local/` is never committed.
+const LOCAL_ICON_PNG: &str = "local/app-icon.png";
+const LOCAL_ICON_ICO: &str = "local/app-icon.ico";
+
+/// Hands the local icon, or nothing, to `util::app_icon_rgba`.
+fn stage_local_icon() {
+    println!("cargo:rerun-if-changed={LOCAL_ICON_PNG}");
+    let out = std::path::Path::new(&std::env::var_os("OUT_DIR").unwrap()).join("app-icon.png");
+    let bytes = std::fs::read(LOCAL_ICON_PNG).unwrap_or_default();
+    std::fs::write(out, bytes).expect("stage the app icon");
+}
+
 fn main() {
     fastframe_i18n::build::compile_catalogs("assets/i18n");
+    stage_local_icon();
     #[cfg(windows)]
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
         println!("cargo:rerun-if-changed=packaging/windows/spotifast.ico");
+        println!("cargo:rerun-if-changed={LOCAL_ICON_ICO}");
+        let icon = if std::path::Path::new(LOCAL_ICON_ICO).is_file() {
+            LOCAL_ICON_ICO
+        } else {
+            "packaging/windows/spotifast.ico"
+        };
         let mut resource = winresource::WindowsResource::new();
         resource
-            .set_icon("packaging/windows/spotifast.ico")
+            .set_icon(icon)
             .set("ProductName", "Spotifast")
             // Task Manager and other Windows lists name the process by its
             // file description, so it carries the app's name.

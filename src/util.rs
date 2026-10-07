@@ -218,8 +218,28 @@ pub fn tray_template_rgba(size: usize) -> Vec<u8> {
 ///
 /// It is the polished disc of `packaging/icons` at every size: a darker rim
 /// around a lit face.
+///
+/// A personal build with its own `local/app-icon.png` (see `build.rs`) uses
+/// that picture instead, everywhere the mark would be.
 pub fn app_icon_rgba(size: usize) -> Vec<u8> {
-    mark_rgba(size, true)
+    local_icon_rgba(size).unwrap_or_else(|| mark_rgba(size, true))
+}
+
+/// The local icon staged by `build.rs`: empty when the build has none.
+const LOCAL_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/app-icon.png"));
+
+fn local_icon_rgba(size: usize) -> Option<Vec<u8>> {
+    if LOCAL_ICON.is_empty() {
+        return None;
+    }
+    let image = image::load_from_memory_with_format(LOCAL_ICON, image::ImageFormat::Png).ok()?;
+    let side = u32::try_from(size).ok()?;
+    Some(
+        image
+            .resize_exact(side, side, image::imageops::FilterType::Lanczos3)
+            .to_rgba8()
+            .into_raw(),
+    )
 }
 
 /// Mixes two colours, `t` of the way from `a` to `b`.
@@ -393,7 +413,8 @@ mod tests {
     #[test]
     fn the_icon_is_polished_at_every_size() {
         // #given the icon at a dock size and at a tray size
-        let (large, small) = (app_icon_rgba(128), app_icon_rgba(32));
+        // (the built-in mark: a personal build may have its own icon)
+        let (large, small) = (mark_rgba(128, true), mark_rgba(32, true));
 
         // #then both have a darker rim around a lighter face
         let rim = pixel(&large, 128, 64, 6);

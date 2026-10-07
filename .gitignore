@@ -13,3 +13,5 @@ docs/.bundle/
 /.cache/
 
 /dist/
+# A personal build's own files, such as its icon (see build.rs).
+/local/
