@@ -772,7 +772,7 @@ fn playlist_entry(
     depth: u8,
 ) -> Entry {
     Entry {
-        image: pick_image(&playlist.images, 64).map(str::to_string),
+        image: pick_image(&playlist.images, super::row_art()).map(str::to_string),
         grid_image: pick_image(&playlist.images, super::GRID_ART_TARGET_WIDTH).map(str::to_string),
         name: playlist.name.clone(),
         // Translators: {owner} is the name of the playlist's owner.
@@ -1077,7 +1077,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
                     album.artists.iter().map(|artist| artist.name.as_str()),
                 );
                 entries.push(Entry {
-                    image: pick_image(&album.images, 64).map(str::to_string),
+                    image: pick_image(&album.images, super::row_art()).map(str::to_string),
                     grid_image: pick_image(&album.images, super::GRID_ART_TARGET_WIDTH)
                         .map(str::to_string),
                     name: album.name.clone(),
@@ -1107,7 +1107,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
                     continue;
                 }
                 entries.push(Entry {
-                    image: pick_image(&artist.images, 64).map(str::to_string),
+                    image: pick_image(&artist.images, super::row_art()).map(str::to_string),
                     grid_image: pick_image(&artist.images, super::GRID_ART_TARGET_WIDTH)
                         .map(str::to_string),
                     name: artist.name.clone(),
@@ -1142,7 +1142,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
                     continue;
                 }
                 entries.push(Entry {
-                    image: pick_image(&show.images, 64).map(str::to_string),
+                    image: pick_image(&show.images, super::row_art()).map(str::to_string),
                     grid_image: pick_image(&show.images, super::GRID_ART_TARGET_WIDTH)
                         .map(str::to_string),
                     name: show.name.clone(),

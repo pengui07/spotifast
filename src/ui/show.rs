@@ -49,7 +49,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui, id: &str) {
             theme::section_title(ui, &palette, &gettext(locale, "All episodes"));
             ui.add_space(6.0);
             let episodes = page.episodes.items.clone();
-            let show_image = pick_image(&show.images, 64).map(str::to_string);
+            let show_image = pick_image(&show.images, super::row_art()).map(str::to_string);
             widgets::virtual_rows(ui, episodes.len(), EPISODE_ROW_HEIGHT, |ui, index| {
                 episode_row(app, ui, &episodes[index], show_image.as_deref());
             });
@@ -221,7 +221,7 @@ pub fn episode_row(
     }
     let inner = rect.shrink2(vec2(12.0, 12.0));
     let cover_rect = Rect::from_min_size(inner.min, Vec2::splat(96.0));
-    let image = pick_image(&episode.images, 64).or(fallback_image);
+    let image = pick_image(&episode.images, super::row_art()).or(fallback_image);
     widgets::paint_cover(
         ui,
         &palette,

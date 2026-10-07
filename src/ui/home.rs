@@ -58,7 +58,7 @@ fn quick_access(app: &mut App, ui: &mut egui::Ui) {
     if let Some(playlists) = app.library.playlists.get() {
         for playlist in playlists.iter().take(7) {
             tiles.push(Tile {
-                image: pick_image(&playlist.images, 64).map(str::to_string),
+                image: pick_image(&playlist.images, super::row_art()).map(str::to_string),
                 name: playlist.name.clone(),
                 page: Page::Playlist(playlist.id.clone()),
                 uri: Some(playlist.uri.clone()),

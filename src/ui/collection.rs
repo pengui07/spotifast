@@ -53,8 +53,8 @@ pub(super) fn hero_images<'a>(
                 })
         }),
         thumbnail: image
-            .and_then(|_| preview.and_then(|images| pick_image(images, 64)))
-            .or_else(|| pick_image(images, 64)),
+            .and_then(|_| preview.and_then(|images| pick_image(images, super::row_art())))
+            .or_else(|| pick_image(images, super::row_art())),
         align_thumbnail,
     }
 }

@@ -34,6 +34,10 @@ use crate::theme::{self, Icon};
 pub fn show(app: &mut App, ui: &mut egui::Ui) {
     let ctx = ui.ctx().clone();
     let ctx = &ctx;
+    ROW_ART_TARGET.store(
+        row_art_for(ctx.pixels_per_point()),
+        std::sync::atomic::Ordering::Relaxed,
+    );
     keys::handle(app, ctx);
     for path in winamp::dropped_skins(ctx) {
         app.actions.push(Action::InstallSkin(path));
@@ -196,6 +200,24 @@ pub(crate) fn panel_width_chosen(ctx: &Context, id: &str, fit: &PanelFit) -> boo
 
 /// Spotify artwork width used by the library grid and its page preview.
 const GRID_ART_TARGET_WIDTH: u32 = 300;
+
+/// The largest cover a list row draws, in points: the player bar's.
+const ROW_COVER_POINTS: f32 = 56.0;
+
+/// The artwork width list rows ask Spotify for, set each frame from the
+/// display scale. Spotify offers covers 64, 300 and 640 pixels wide, and 64
+/// is only sharp at 100%: on a scaled display a row's cover is drawn larger
+/// than that, and blurs.
+static ROW_ART_TARGET: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(64);
+
+/// The artwork width for a list row's cover on this display.
+pub fn row_art() -> u32 {
+    ROW_ART_TARGET.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+fn row_art_for(pixels_per_point: f32) -> u32 {
+    ((ROW_COVER_POINTS * pixels_per_point).ceil() as u32).max(64)
+}
 
 /// Keeps the most recent loading preview of each metadata type available to
 /// the loaded hero as an artwork fallback. The fixed typed slot bounds this to
@@ -640,6 +662,32 @@ fn toasts(app: &mut App, ctx: &egui::Context, bottom_offset: f32) {
                     });
             }
         });
+}
+
+#[cfg(test)]
+mod row_art_tests {
+    use super::*;
+
+    /// Spotify's 64-pixel covers blurred in rows on scaled displays.
+    #[test]
+    fn rows_ask_for_covers_as_wide_as_the_display_draws_them() {
+        let small = vec![
+            crate::api::models::Image {
+                url: "64".into(),
+                width: Some(64),
+                height: Some(64),
+            },
+            crate::api::models::Image {
+                url: "300".into(),
+                width: Some(300),
+                height: Some(300),
+            },
+        ];
+        let pick = |scale| crate::api::models::pick_image(&small, row_art_for(scale));
+        assert_eq!(pick(1.0), Some("64"));
+        assert_eq!(pick(1.25), Some("300"));
+        assert_eq!(pick(1.5), Some("300"));
+    }
 }
 
 #[cfg(test)]

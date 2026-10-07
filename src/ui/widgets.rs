@@ -139,7 +139,16 @@ fn paint_cover_url(
     if let Some(art) = art {
         art.touch(url);
     }
-    let image = egui::Image::new(url).show_loading_spinner(false);
+    // Covers are usually drawn far smaller than Spotify's file: a 640-pixel
+    // playlist cover in a 48-point row. Plain linear sampling skips most of
+    // its pixels and the cover looks grainy; mipmaps average them, so a
+    // cover shrinks as smoothly as it does in Spotify.
+    let image = egui::Image::new(url)
+        .show_loading_spinner(false)
+        .texture_options(egui::TextureOptions {
+            mipmap_mode: Some(egui::TextureFilter::Linear),
+            ..egui::TextureOptions::LINEAR
+        });
     let Ok(egui::load::TexturePoll::Ready { texture }) = image.load_for_size(ui.ctx(), rect.size())
     else {
         return false;
@@ -1317,7 +1326,7 @@ fn track_row_contents(
             ui.ctx(),
             DragTrack {
                 title: preview.name().to_string(),
-                image: preview.image(64).map(str::to_string),
+                image: preview.image(super::row_art()).map(str::to_string),
                 items,
                 from,
                 source_playlist,
@@ -1404,7 +1413,7 @@ fn track_row_contents(
         paint_cover(
             ui,
             &palette,
-            row.item.image(64),
+            row.item.image(super::row_art()),
             cover_rect,
             4.0,
             if row.item.is_track() {
