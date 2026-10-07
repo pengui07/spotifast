@@ -9041,7 +9041,12 @@ impl App {
                     self.close_cover_view();
                 } else {
                     self.cover_view = true;
-                    self.fullscreen_cover = true;
+                    // Lyrics open in their panel come into the view with it.
+                    if self.show_lyrics_panel {
+                        self.show_view_lyrics();
+                    } else {
+                        self.fullscreen_cover = true;
+                    }
                 }
             }
             Action::LyricsLineShown(line) => {
@@ -17133,6 +17138,26 @@ mod tests {
                 .collect();
             assert_eq!(commands, vec![true, was_fullscreen]);
         }
+    }
+
+    #[test]
+    fn now_playing_view_opens_with_the_lyrics_their_panel_showed() {
+        let mut app = headless_app();
+        let ctx = egui::Context::default();
+        let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
+            app.apply(Action::ToggleLyricsPanel, ui.ctx());
+            assert!(app.show_lyrics_panel);
+            app.apply(Action::ToggleCoverView, ui.ctx());
+            assert!(app.cover_view && !app.fullscreen_cover);
+            // Hiding them there shows the cover, and the panel stays shut
+            // once the view closes.
+            app.apply(Action::ToggleLyricsPanel, ui.ctx());
+            assert!(app.fullscreen_cover);
+            app.apply(Action::ToggleCoverView, ui.ctx());
+            assert!(!app.cover_view && !app.show_lyrics_panel);
+        });
+        output.textures_delta.clear();
+        app.backend.shutdown();
     }
 
     #[test]
