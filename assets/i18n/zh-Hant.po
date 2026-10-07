@@ -146,6 +146,12 @@ msgstr "藝人"
 msgid "Podcast • {publisher}"
 msgstr "Podcast • {publisher}"
 
+#. Translators: {podcast} is the name of the podcast the episode is from.
+#: src/ui/search.rs
+#, rust-format
+msgid "Episode • {podcast}"
+msgstr "單集 • {podcast}"
+
 #: src/ui/sidebar.rs:1197
 msgid "Nothing here yet."
 msgstr "這裡還沒有內容。"

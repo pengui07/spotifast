@@ -746,35 +746,6 @@ pub fn soft_button(
     label: &str,
     active: bool,
 ) -> Response {
-    soft_button_inner(ui, palette, icon, label, active, false).0
-}
-
-/// A [`soft_button`] whose icon turns into a cross on hover, allowing the
-/// entry to be dismissed. The returned flag reports clicks on that cross.
-pub fn soft_button_dismiss(
-    ui: &mut egui::Ui,
-    palette: &Palette,
-    icon: Icon,
-    label: &str,
-) -> (Response, bool) {
-    soft_button_inner(ui, palette, Some(icon), label, false, true)
-}
-
-/// The width `soft_button` gives a button without an icon, for laying out
-/// a row of them before drawing it.
-pub fn soft_button_width(ui: &egui::Ui, label: &str) -> f32 {
-    let galley = crate::bidi::layout_line(ui.painter(), label, medium(13.0), Color32::WHITE);
-    galley.size().x + 24.0
-}
-
-fn soft_button_inner(
-    ui: &mut egui::Ui,
-    palette: &Palette,
-    icon: Option<Icon>,
-    label: &str,
-    active: bool,
-    dismissible: bool,
-) -> (Response, bool) {
     let font = medium(13.0);
     let color = if active { palette.window } else { palette.text };
     let galley = crate::bidi::layout_line(ui.painter(), label, font, color);
@@ -786,35 +757,10 @@ fn soft_button_inner(
     response.widget_info(|| {
         egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), label)
     });
-    let icon_rect = egui::Rect::from_center_size(
-        egui::pos2(rect.left() + padding.x + icon_size / 2.0, rect.center().y),
-        Vec2::splat(icon_size),
-    );
-    // Claimed after the button, so the cross sits on top and keeps its own click.
-    let dismiss = (dismissible && icon.is_some()).then(|| {
-        let dismiss = ui.interact(
-            icon_rect.expand(3.0),
-            response.id.with("dismiss"),
-            Sense::click(),
-        );
-        dismiss.widget_info(|| {
-            egui::WidgetInfo::labeled(
-                egui::WidgetType::Button,
-                ui.is_enabled(),
-                format!("Remove {label}"),
-            )
-        });
-        dismiss
-    });
-    let dismissed = dismiss.as_ref().is_some_and(Response::clicked);
-    let over_dismiss = dismiss
-        .as_ref()
-        .is_some_and(|dismiss| dismiss.hovered() || dismiss.has_focus());
     if ui.is_rect_visible(rect) {
-        let hovered = response.hovered() || over_dismiss;
         let fill = if active {
             palette.text
-        } else if hovered {
+        } else if response.hovered() {
             palette.surface_hover
         } else {
             palette.surface
@@ -822,11 +768,10 @@ fn soft_button_inner(
         ui.painter().rect_filled(rect, rect.height() / 2.0, fill);
         let mut x = rect.left() + padding.x;
         if let Some(icon) = icon {
-            let icon = if dismiss.is_some() && hovered {
-                Icon::X
-            } else {
-                icon
-            };
+            let icon_rect = egui::Rect::from_center_size(
+                egui::pos2(rect.left() + padding.x + icon_size / 2.0, rect.center().y),
+                Vec2::splat(icon_size),
+            );
             icon.image(color, icon_size).paint_at(ui, icon_rect);
             x += icon_width;
         }
@@ -834,10 +779,14 @@ fn soft_button_inner(
         ui.painter().galley(pos, galley, color);
     }
     focus_ring(ui, &response);
-    if let Some(dismiss) = dismiss {
-        focus_ring(ui, &dismiss);
-    }
-    (response, dismissed)
+    response
+}
+
+/// The width `soft_button` gives a button without an icon, for laying out
+/// a row of them before drawing it.
+pub fn soft_button_width(ui: &egui::Ui, label: &str) -> f32 {
+    let galley = crate::bidi::layout_line(ui.painter(), label, medium(13.0), Color32::WHITE);
+    galley.size().x + 24.0
 }
 
 /// An animated busy indicator paced independently of the graphics driver.

@@ -145,6 +145,15 @@ Library sidebar to start playing it. A single click still opens the row's page.
 Pointing at a row's cover art also shows a play button, but only when the
 sidebar is not in compact mode.
 
+## Recent searches
+
+With the search box empty, Search lists what you opened or played from
+earlier results, newest first, with each one's cover: songs, artists,
+albums, playlists, podcasts, and episodes. Click a song or an episode to play
+it again, or anything else to open its page. Point at a row and click its
+cross to forget it, or use Clear to forget them all. Typing alone never adds
+anything, so pausing mid-word leaves no half-typed queries behind.
+
 ## Search from a launcher
 
 **In development, not included in 0.8.0:** a Spotify search link opens Search

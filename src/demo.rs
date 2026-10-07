@@ -544,7 +544,37 @@ pub fn populate(app: &mut App) {
         shows: Some(page((0..4).map(show).collect())),
         episodes: Some(page((0..4).map(|index| episode(index, 1)).collect())),
     });
-    app.settings.search_history = vec!["Khruangbin".into(), "ambient".into(), "Rework".into()];
+    // Recent searches: one of each kind, as if opened or played from results.
+    if let Some(results) = app.search.results.get() {
+        let picks = [
+            results
+                .artists
+                .as_ref()
+                .map(|page| page.items[0].uri.clone()),
+            results
+                .tracks
+                .as_ref()
+                .map(|page| page.items[1].uri.clone()),
+            results
+                .albums
+                .as_ref()
+                .map(|page| page.items[2].uri.clone()),
+            results
+                .playlists
+                .as_ref()
+                .map(|page| page.items[1].uri.clone()),
+            results.shows.as_ref().map(|page| page.items[0].uri.clone()),
+            results
+                .episodes
+                .as_ref()
+                .map(|page| page.items[0].uri.clone()),
+        ];
+        app.settings.recent_searches = picks
+            .iter()
+            .flatten()
+            .filter_map(|uri| crate::app::recent_search_from(results, uri))
+            .collect();
+    }
 
     // Playback: a remote speaker is playing the second playlist.
     app.queue = Loadable::Loaded(Queue {
@@ -2788,25 +2818,32 @@ mod tests {
     }
 
     #[test]
-    fn the_cross_on_a_recent_search_forgets_only_that_query() {
+    fn the_cross_on_a_recent_search_forgets_only_that_result() {
         use egui::accesskit::{Action as AccessibleAction, Role};
         let (ctx, mut app) = accessible_app("search-history");
         app.open(Page::Search);
         // Recent searches stand in for results only while nothing is searched
         app.search.query.clear();
         app.search.committed.clear();
+        let before = app.settings.recent_searches.clone();
+        assert!(before.len() > 2, "the demo remembers several results");
+        let gone = before[1].clone();
         accessible_frame(&ctx, &mut app, vec![]);
         let tree = accessible_frame(&ctx, &mut app, vec![]);
-        let forget = accessible_node(&tree, "Remove ambient", Role::Button);
+        let forget = accessible_node(&tree, &format!("Remove {}", gone.name), Role::Button);
         accessible_frame(
             &ctx,
             &mut app,
             vec![accessible_action(forget, AccessibleAction::Click, None)],
         );
-        assert_eq!(app.settings.search_history, ["Khruangbin", "Rework"]);
+        let kept: Vec<_> = before
+            .into_iter()
+            .filter(|entry| entry.uri != gone.uri)
+            .collect();
+        assert_eq!(app.settings.recent_searches, kept);
         assert!(
-            app.search.committed.is_empty(),
-            "the cross must forget a query without running it"
+            matches!(app.page(), Page::Search),
+            "the cross must forget a result without opening it"
         );
         app.backend.shutdown();
     }

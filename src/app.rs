@@ -4602,6 +4602,42 @@ impl App {
         }
     }
 
+    /// The search result an action opens or plays while the Search page
+    /// shows it, for Recent searches. Only what the listener goes on to
+    /// open or play is remembered, never the query: a query typed with
+    /// pauses runs a search at each pause (#741).
+    fn search_pick(&self, action: &Action) -> Option<crate::settings::RecentSearch> {
+        if !matches!(self.page(), Page::Search) {
+            return None;
+        }
+        let uri = match action {
+            Action::Open(page) => match page {
+                Page::Artist(id) => format!("spotify:artist:{id}"),
+                Page::Album(id) => format!("spotify:album:{id}"),
+                Page::Playlist(id) => format!("spotify:playlist:{id}"),
+                Page::Show(id) => format!("spotify:show:{id}"),
+                _ => return None,
+            },
+            Action::PlayContext { uri, .. }
+            | Action::PlayEpisode { uri, .. }
+            | Action::PlayFromRow { uri, .. } => uri.clone(),
+            Action::PlayUris { uris, index } => uris.get(*index as usize)?.clone(),
+            _ => return None,
+        };
+        let shown = (!self.search.committed.is_empty())
+            .then(|| self.search.results.get())
+            .flatten();
+        shown
+            .and_then(|results| recent_search_from(results, &uri))
+            .or_else(|| {
+                self.settings
+                    .recent_searches
+                    .iter()
+                    .find(|entry| entry.uri == uri)
+                    .cloned()
+            })
+    }
+
     fn search_failed(&mut self, part: &str, error: impl std::fmt::Display) {
         let message = format!("{part}: {error}");
         self.search.error = Some(match self.search.error.take() {
@@ -5920,8 +5956,6 @@ impl App {
                     Ok(page) => {
                         self.search.playlists = Some((serial, page));
                         self.show_search_playlists();
-                        self.settings.remember_search(&query);
-                        self.settings_dirty = true;
                     }
                     Err(error) => self.search_failed(&gettext(self.locale, "Playlists"), error),
                 }
@@ -5944,8 +5978,6 @@ impl App {
                             .map(|track| track.uri.clone())
                             .collect();
                         self.request_contains(uris);
-                        self.settings.remember_search(&query);
-                        self.settings_dirty = true;
                         self.search.results = Loadable::Loaded(results);
                         self.search.results_serial = serial;
                         self.show_search_playlists();
@@ -8303,6 +8335,10 @@ impl App {
             }
             _ => {}
         }
+        if let Some(pick) = self.search_pick(&action) {
+            self.settings.remember_search(pick);
+            self.settings_dirty = true;
+        }
         if matches!(
             &action,
             Action::Open(_)
@@ -8914,8 +8950,14 @@ impl App {
                 self.open(Page::Search);
                 self.run_search(query.trim().to_string());
             }
-            Action::ForgetSearch(query) => {
-                self.settings.search_history.retain(|entry| entry != &query);
+            Action::ForgetSearch(uri) => {
+                self.settings
+                    .recent_searches
+                    .retain(|entry| entry.uri != uri);
+                self.settings_dirty = true;
+            }
+            Action::ClearRecentSearches => {
+                self.settings.recent_searches.clear();
                 self.settings_dirty = true;
             }
             Action::SetSearchFilter(filter) => self.search.filter = filter,
@@ -10238,6 +10280,75 @@ impl App {
         }
         true
     }
+}
+
+/// The row Recent searches keeps for a result, found by its URI among the
+/// results on screen.
+pub(crate) fn recent_search_from(
+    results: &crate::api::models::SearchResults,
+    uri: &str,
+) -> Option<crate::settings::RecentSearch> {
+    use crate::api::models::{join_names, pick_image};
+    use crate::settings::RecentSearch;
+    const COVER: u32 = 160;
+    fn find<T>(
+        page: &Option<crate::api::models::Page<T>>,
+        hit: impl Fn(&T) -> bool,
+    ) -> Option<&T> {
+        page.as_ref()?.items.iter().find(|item| hit(item))
+    }
+    let entry = |name: &str, detail: String, image: Option<&str>| RecentSearch {
+        uri: uri.to_string(),
+        name: name.to_string(),
+        detail,
+        image: image.map(str::to_string),
+    };
+    let artists = |artists: &[crate::api::models::ArtistRef]| {
+        join_names(artists.iter().map(|artist| artist.name.as_str()))
+    };
+    if let Some(track) = find(&results.tracks, |track| track.uri == uri) {
+        return Some(entry(
+            &track.name,
+            artists(&track.artists),
+            track.image(COVER),
+        ));
+    }
+    if let Some(artist) = find(&results.artists, |artist| artist.uri == uri) {
+        return Some(entry(
+            &artist.name,
+            String::new(),
+            pick_image(&artist.images, COVER),
+        ));
+    }
+    if let Some(album) = find(&results.albums, |album| album.uri == uri) {
+        return Some(entry(
+            &album.name,
+            artists(&album.artists),
+            pick_image(&album.images, COVER),
+        ));
+    }
+    if let Some(playlist) = find(&results.playlists, |playlist| playlist.uri == uri) {
+        return Some(entry(
+            &playlist.name,
+            playlist.owner_name().to_string(),
+            pick_image(&playlist.images, COVER),
+        ));
+    }
+    if let Some(show) = find(&results.shows, |show| show.uri == uri) {
+        return Some(entry(
+            &show.name,
+            show.publisher.clone(),
+            pick_image(&show.images, COVER),
+        ));
+    }
+    let episode = find(&results.episodes, |episode| episode.uri == uri)?;
+    let show = episode.show.as_ref();
+    Some(entry(
+        &episode.name,
+        show.map(|show| show.name.clone()).unwrap_or_default(),
+        pick_image(&episode.images, COVER)
+            .or_else(|| show.and_then(|show| pick_image(&show.images, COVER))),
+    ))
 }
 
 fn same_recording_hint(left: &Track, right: &Track) -> bool {
@@ -14829,6 +14940,82 @@ mod tests {
             assert!(!app.search.catalogue_pending && !app.search.playlists_pending);
             app.backend.shutdown();
         }
+    }
+
+    fn searched_album_and_song(app: &mut App, query: &str) {
+        let serial = searching(app, query);
+        app.handle_api(ApiResponse::Search {
+            query: query.into(),
+            serial,
+            result: Ok(crate::api::models::SearchResults {
+                tracks: Some(crate::api::models::Page {
+                    items: vec![Track {
+                        name: "Song".into(),
+                        uri: "spotify:track:song".into(),
+                        ..Track::default()
+                    }],
+                    ..Default::default()
+                }),
+                albums: Some(crate::api::models::Page {
+                    items: vec![crate::api::models::Album {
+                        id: "album".into(),
+                        name: "Album".into(),
+                        uri: "spotify:album:album".into(),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+        });
+    }
+
+    /// #741: a query typed with pauses runs a search at each pause, and none
+    /// of them is a recent search until a result is opened or played.
+    #[test]
+    fn searches_run_while_typing_leave_no_recent_search() {
+        let mut app = test_app("search-typing-history");
+        app.open(Page::Search);
+        for query in ["ab", "abs", "absolut", "absolutely"] {
+            searched_album_and_song(&mut app, query);
+        }
+        assert!(app.settings.recent_searches.is_empty());
+        app.backend.shutdown();
+    }
+
+    #[test]
+    fn a_result_opened_or_played_from_search_is_remembered_once_at_the_front() {
+        let ctx = egui::Context::default();
+        let mut app = test_app("search-picks");
+        app.open(Page::Search);
+        searched_album_and_song(&mut app, "song");
+        app.apply(Action::Open(Page::Album("album".into())), &ctx);
+        assert_eq!(app.settings.recent_searches.len(), 1);
+        assert_eq!(app.settings.recent_searches[0].name, "Album");
+
+        app.open(Page::Search);
+        app.apply(
+            Action::PlayFromRow {
+                context: RowContext::Uris(vec!["spotify:track:song".to_string()].into()),
+                uri: "spotify:track:song".into(),
+                index: 0,
+            },
+            &ctx,
+        );
+        app.apply(Action::Open(Page::Album("album".into())), &ctx);
+        let uris: Vec<_> = app
+            .settings
+            .recent_searches
+            .iter()
+            .map(|entry| entry.uri.as_str())
+            .collect();
+        assert_eq!(uris, ["spotify:album:album", "spotify:track:song"]);
+
+        // The same album opened from anywhere but Search is not a search.
+        app.settings.recent_searches.clear();
+        app.apply(Action::Open(Page::Album("album".into())), &ctx);
+        assert!(app.settings.recent_searches.is_empty());
+        app.backend.shutdown();
     }
 
     fn cover_dialog(request: Option<u64>) -> Dialog {

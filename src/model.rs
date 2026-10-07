@@ -1063,7 +1063,9 @@ pub enum Action {
     OpenUrl(String),
     OpenInSpotify(String),
     Search(String),
+    /// Remove one result, by URI, from Recent searches.
     ForgetSearch(String),
+    ClearRecentSearches,
     SetSearchFilter(SearchFilter),
     FocusSearch,
     LoadMore(Page),

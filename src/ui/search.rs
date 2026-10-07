@@ -8,6 +8,7 @@ use crate::api::models::{Artist, ArtistRef, PlayableItem, SearchResults, pick_im
 use crate::app::App;
 use crate::i18n::gettext;
 use crate::model::{Action, Loadable, Page, RowContext, SearchFilter};
+use crate::settings::RecentSearch;
 use crate::theme::{self, Icon};
 
 use super::widgets::{self, TrackRow};
@@ -82,8 +83,9 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
 
 fn recent(app: &mut App, ui: &mut egui::Ui) {
     let palette = app.palette;
+    let locale = app.locale;
     ui.add_space(6.0);
-    if app.settings.search_history.is_empty() {
+    if app.settings.recent_searches.is_empty() {
         widgets::empty_state(
             ui,
             &palette,
@@ -96,20 +98,182 @@ fn recent(app: &mut App, ui: &mut egui::Ui) {
         );
         return;
     }
-    theme::section_title(ui, &palette, &gettext(app.locale, "Recent searches"));
-    ui.add_space(6.0);
-    let history = app.settings.search_history.clone();
-    ui.horizontal_wrapped(|ui| {
-        ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
-        for query in &history {
-            let (response, forget) = theme::soft_button_dismiss(ui, &palette, Icon::Clock, query);
-            if forget {
-                app.actions.push(Action::ForgetSearch(query.clone()));
-            } else if response.clicked() {
-                app.actions.push(Action::Search(query.clone()));
+    ui.horizontal(|ui| {
+        theme::section_title(ui, &palette, &gettext(locale, "Recent searches"));
+        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            if theme::soft_button(ui, &palette, None, &gettext(locale, "Clear"), false).clicked() {
+                app.actions.push(Action::ClearRecentSearches);
             }
-        }
+        });
     });
+    ui.add_space(10.0);
+    // The page is wide and the rows are short, so they flow into as many
+    // columns as fit, newest first along each line.
+    const GAP: f32 = 12.0;
+    const MIN_COLUMN: f32 = 320.0;
+    let width = ui.available_width();
+    let columns = ((width + GAP) / (MIN_COLUMN + GAP)).floor().clamp(1.0, 3.0) as usize;
+    let column = (width - GAP * (columns - 1) as f32) / columns as f32;
+    let recents = app.settings.recent_searches.clone();
+    for line in recents.chunks(columns) {
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = GAP;
+            for entry in line {
+                recent_row(app, ui, entry, column);
+            }
+        });
+        ui.add_space(4.0);
+    }
+}
+
+/// What a recent result's second line says: its kind, then who made it.
+fn recent_subtitle(locale: crate::i18n::Locale, entry: &RecentSearch) -> String {
+    let with = |text: std::borrow::Cow<'_, str>, key: &str| text.replace(key, &entry.detail);
+    match entry.kind() {
+        "track" => format!("{}{}", gettext(locale, "Song • "), entry.detail),
+        "artist" => gettext(locale, "Artist").into_owned(),
+        "album" => with(gettext(locale, "Album • {artists}"), "{artists}"),
+        "playlist" => with(gettext(locale, "Playlist • {owner}"), "{owner}"),
+        "show" => with(gettext(locale, "Podcast • {publisher}"), "{publisher}"),
+        // Translators: {podcast} is the name of the podcast the episode is from.
+        "episode" => with(gettext(locale, "Episode • {podcast}"), "{podcast}"),
+        _ => entry.detail.clone(),
+    }
+    .trim_end_matches([' ', '•'])
+    .to_string()
+}
+
+/// One result the listener opened or played from an earlier search. A song
+/// or an episode plays again; anything else opens its page.
+fn recent_row(app: &mut App, ui: &mut egui::Ui, entry: &RecentSearch, width: f32) {
+    let palette = app.palette;
+    let subtitle = recent_subtitle(app.locale, entry);
+    let (rect, response) = ui.allocate_exact_size(vec2(width, 64.0), Sense::click());
+    response.widget_info(|| {
+        egui::WidgetInfo::labeled(
+            egui::WidgetType::Button,
+            ui.is_enabled(),
+            format!("{}, {subtitle}", entry.name),
+        )
+    });
+    // Claimed after the row, so the cross keeps its own click.
+    let cross_rect = Rect::from_center_size(
+        pos2(rect.right() - 26.0, rect.center().y),
+        Vec2::splat(32.0),
+    );
+    let cross = ui
+        .interact(cross_rect, response.id.with("forget"), Sense::click())
+        .on_hover_text(gettext(app.locale, "Remove"));
+    cross.widget_info(|| {
+        egui::WidgetInfo::labeled(
+            egui::WidgetType::Button,
+            ui.is_enabled(),
+            format!("Remove {}", entry.name),
+        )
+    });
+    let kind = entry.kind();
+    let playing = app.believed_playing()
+        && (app.current_track_uri().as_deref() == Some(entry.uri.as_str())
+            || app.playing_context_uri().as_deref() == Some(entry.uri.as_str()));
+    if ui.is_rect_visible(rect) {
+        let hovered = ui.rect_contains_pointer(rect) || response.has_focus() || cross.has_focus();
+        if hovered {
+            ui.painter().rect_filled(
+                rect,
+                CornerRadius::same(theme::RADIUS),
+                palette.surface_hover,
+            );
+        }
+        let round = kind == "artist";
+        let cover = Rect::from_min_size(
+            pos2(rect.left() + 8.0, rect.center().y - 24.0),
+            Vec2::splat(48.0),
+        );
+        widgets::paint_cover(
+            ui,
+            &palette,
+            entry.image.as_deref(),
+            cover,
+            if round { 24.0 } else { 4.0 },
+            if round { Icon::User } else { Icon::Music },
+            Some(app.backend.art()),
+        );
+        let text_left = cover.right() + 12.0;
+        let text_width = (cross_rect.left() - 8.0 - text_left).max(0.0);
+        let title_color = if playing {
+            palette.accent
+        } else {
+            palette.text
+        };
+        let title = widgets::ellipsized(
+            ui,
+            &entry.name,
+            theme::semibold(14.5),
+            title_color,
+            text_width,
+            1,
+        );
+        let detail = widgets::ellipsized(
+            ui,
+            &subtitle,
+            theme::regular(13.0),
+            palette.secondary,
+            text_width,
+            1,
+        );
+        let gap = 3.0;
+        let top = rect.center().y - (title.size().y + gap + detail.size().y) / 2.0;
+        ui.painter()
+            .galley(pos2(text_left, top), title.clone(), title_color);
+        ui.painter().galley(
+            pos2(text_left, top + title.size().y + gap),
+            detail,
+            palette.secondary,
+        );
+        if hovered {
+            let color = if cross.hovered() {
+                palette.text
+            } else {
+                palette.secondary
+            };
+            Icon::X.image(color, 16.0).paint_at(
+                ui,
+                Rect::from_center_size(cross_rect.center(), Vec2::splat(16.0)),
+            );
+        } else if playing {
+            theme::paint_playing_bars(
+                ui,
+                Rect::from_center_size(cross_rect.center(), Vec2::splat(16.0)),
+                16.0,
+                palette.accent,
+            );
+        }
+    }
+    if cross.clicked() {
+        app.actions.push(Action::ForgetSearch(entry.uri.clone()));
+    } else if response.clicked() {
+        let uri = entry.uri.clone();
+        let action = match kind {
+            "track" => Some(Action::PlayUris {
+                uris: vec![uri],
+                index: 0,
+            }),
+            "episode" => Some(Action::PlayEpisode {
+                uri,
+                resume_ms: None,
+            }),
+            _ => Page::from_uri(&uri).map(Action::Open),
+        };
+        app.actions.extend(action);
+    }
+    if !matches!(kind, "track" | "episode") {
+        egui::Popup::context_menu(&response)
+            .id(ui.make_persistent_id(("recent-search-menu", &entry.uri)))
+            .frame(widgets::menu_frame(&palette))
+            .show(|ui| {
+                widgets::context_menu_items(ui, app, &entry.uri, &entry.name, None);
+            });
+    }
 }
 
 fn all(app: &mut App, ui: &mut egui::Ui, results: &SearchResults) {

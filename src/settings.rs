@@ -38,6 +38,29 @@ impl LibrarySort {
     }
 }
 
+/// How many results Recent searches keeps.
+pub const RECENT_SEARCHES: usize = 20;
+
+/// A search result the listener opened or played, kept with what its row
+/// shows so Recent searches draws without asking Spotify again.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct RecentSearch {
+    /// The Spotify URI; its kind says whether this is a song, an artist,
+    /// an album, a playlist, a podcast or an episode.
+    pub uri: String,
+    pub name: String,
+    /// The artists, the playlist's owner, or the podcast's publisher.
+    pub detail: String,
+    pub image: Option<String>,
+}
+
+impl RecentSearch {
+    pub fn kind(&self) -> &str {
+        self.uri.split(':').nth(1).unwrap_or_default()
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ThemeChoice {
@@ -291,7 +314,11 @@ pub struct Settings {
     /// Linux desktops usually paste the primary selection on middle click.
     /// Windows always autoscrolls and macOS never does.
     pub middle_click_autoscroll: bool,
+    /// Legacy typed queries, retained for older Spotifast versions. Recent
+    /// searches are now what was opened or played from results.
     pub search_history: Vec<String>,
+    /// What the listener opened or played from search results, newest first.
+    pub recent_searches: Vec<RecentSearch>,
     pub show_shortcut_hints: bool,
     /// An optional personal Spotify Web API application id. The shared
     /// application remains active for coverage when this is present.
@@ -454,6 +481,7 @@ impl Default for Settings {
             tracklist_compact: false,
             middle_click_autoscroll: false,
             search_history: Vec::new(),
+            recent_searches: Vec::new(),
             show_shortcut_hints: true,
             web_client_id: None,
             personal_app_nudge_at: None,
@@ -623,14 +651,15 @@ impl Settings {
         })
     }
 
-    pub fn remember_search(&mut self, query: &str) {
-        let query = query.trim();
-        if query.is_empty() {
+    /// Puts a result the listener opened or played at the front of Recent
+    /// searches, once.
+    pub fn remember_search(&mut self, pick: RecentSearch) {
+        if pick.uri.is_empty() {
             return;
         }
-        self.search_history.retain(|entry| entry != query);
-        self.search_history.insert(0, query.to_string());
-        self.search_history.truncate(12);
+        self.recent_searches.retain(|entry| entry.uri != pick.uri);
+        self.recent_searches.insert(0, pick);
+        self.recent_searches.truncate(RECENT_SEARCHES);
     }
 
     pub(crate) fn migrate_proxy(&mut self, text: &str) {
