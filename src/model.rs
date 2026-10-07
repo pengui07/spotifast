@@ -569,6 +569,11 @@ pub struct Library {
     /// The later playlist page on its way, so a second answer for a page
     /// already taken adds nothing.
     pub playlists_asked: Option<u32>,
+    /// A fresh playlist list on its way while the one shown, saved from an
+    /// earlier run or load, stays up; it replaces that one once complete.
+    pub playlists_incoming: Option<Vec<Playlist>>,
+    /// Whether the saved playlist list and "Made for you" were asked for.
+    pub cache_checked: bool,
     pub liked: PagedList<SavedTrack>,
     pub albums: PagedList<SavedAlbum>,
     pub artists: CursorList<Artist>,

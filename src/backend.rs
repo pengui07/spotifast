@@ -710,6 +710,12 @@ pub enum Command {
         generation: u64,
     },
     StoreLikedSongsCache(crate::liked::Cache),
+    /// Read the playlist list and "Made for you" saved for this account.
+    LoadLibraryCache {
+        account_id: String,
+    },
+    StorePlaylistsCache(crate::library_cache::Playlists),
+    StoreMadeForYouCache(crate::library_cache::MadeForYou),
     /// Resolve the precise type of Web API singles through the streaming session.
     AlbumTypes(Vec<String>),
     /// Ask the streaming session which saved shows are audiobooks.
@@ -847,6 +853,10 @@ pub enum Event {
         account_id: String,
         generation: u64,
         cache: Option<crate::liked::Cache>,
+    },
+    LibraryCache {
+        account_id: String,
+        cache: crate::library_cache::Cache,
     },
 }
 
@@ -1970,6 +1980,45 @@ impl Worker {
                         let path = self.dirs.liked_songs_cache_file(&cache.account_id);
                         if let Err(error) = crate::liked::write(&path, &cache).await {
                             log::warn!("unable to store Liked Songs cache: {error}");
+                        }
+                    }
+                }
+                Command::LoadLibraryCache { account_id } => {
+                    let playlists = self.dirs.playlists_cache_file(&account_id);
+                    let made_for_you = self.dirs.made_for_you_cache_file(&account_id);
+                    let events = self.events.clone();
+                    let waker = self.waker.clone();
+                    tokio::spawn(async move {
+                        let cache = crate::library_cache::Cache {
+                            playlists: crate::library_cache::read(&playlists, &account_id).await,
+                            made_for_you: crate::library_cache::read(&made_for_you, &account_id)
+                                .await,
+                        };
+                        let _ = events.send(Event::LibraryCache { account_id, cache });
+                        waker.wake();
+                    });
+                }
+                Command::StorePlaylistsCache(saved) => {
+                    if self
+                        .api
+                        .account()
+                        .is_some_and(|account| account.as_str() == saved.account_id)
+                    {
+                        let path = self.dirs.playlists_cache_file(&saved.account_id);
+                        if let Err(error) = crate::library_cache::write(&path, &saved).await {
+                            log::warn!("unable to store the playlist list: {error}");
+                        }
+                    }
+                }
+                Command::StoreMadeForYouCache(saved) => {
+                    if self
+                        .api
+                        .account()
+                        .is_some_and(|account| account.as_str() == saved.account_id)
+                    {
+                        let path = self.dirs.made_for_you_cache_file(&saved.account_id);
+                        if let Err(error) = crate::library_cache::write(&path, &saved).await {
+                            log::warn!("unable to store Made for you: {error}");
                         }
                     }
                 }

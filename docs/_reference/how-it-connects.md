@@ -118,6 +118,11 @@ current-track pickup.
   carries the Spotify artwork URL for the desktop to resolve and asks for
   nothing extra.
 - Lyrics, in the cache directory, for a month.
+- The playlist list and Home's "Made for you", scoped to the verified
+  account, in the cache directory's `library` folder. Both come from the
+  shared app, which at busy times answers only after a cooldown of about
+  thirty seconds, so the copy saved last time shows at startup until the
+  fresh list is complete and replaces it. A failed refresh leaves it up.
 - Liked Songs metadata, scoped to the verified account, in the cache directory.
   This behavior is available since 0.8.0.
   Cached pages less than 15 minutes old need no repeat request. Older cached

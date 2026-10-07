@@ -122,6 +122,20 @@ impl AppDirs {
         self.playlist_cache_dir().join(account_id)
     }
 
+    /// The playlist list as last seen, for one account (`library_cache`).
+    pub fn playlists_cache_file(&self, account_id: &str) -> PathBuf {
+        self.cache
+            .join("library")
+            .join(format!("{}-playlists.json", hex(account_id)))
+    }
+
+    /// Home's "Made for you" as last seen, for one account.
+    pub fn made_for_you_cache_file(&self, account_id: &str) -> PathBuf {
+        self.cache
+            .join("library")
+            .join(format!("{}-made-for-you.json", hex(account_id)))
+    }
+
     pub fn liked_songs_cache_file(&self, account_id: &str) -> PathBuf {
         // Hex encoding also keeps unusual account IDs within the cache root.
         let account: String = account_id
@@ -139,4 +153,12 @@ impl AppDirs {
         }
         Ok(())
     }
+}
+
+/// Hex keeps unusual account IDs within the cache root.
+fn hex(account_id: &str) -> String {
+    account_id
+        .bytes()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }

@@ -1957,6 +1957,9 @@ impl App {
                 } => {
                     self.receive_liked_cache(&account_id, generation, cache);
                 }
+                Event::LibraryCache { account_id, cache } => {
+                    self.receive_library_cache(&account_id, cache);
+                }
                 Event::UserName { id, name } => {
                     self.set_user_name(id, name);
                 }
@@ -3613,7 +3616,13 @@ impl App {
         if self.library.playlists.is_loading() {
             return;
         }
-        self.library.playlists = Loadable::Loading;
+        self.request_library_cache();
+        // A list already shown stays up until the fresh one is complete.
+        if self.library.playlists.get().is_some() {
+            self.library.playlists_incoming = Some(Vec::new());
+        } else {
+            self.library.playlists = Loadable::Loading;
+        }
         self.library.playlists_next = None;
         self.library.playlists_asked = None;
         self.library.playlists_generation += 1;
@@ -3763,6 +3772,7 @@ impl App {
         {
             return;
         }
+        self.request_library_cache();
         self.home.requested = true;
         self.home.loaded_at = Some(Instant::now());
         self.home.generation += 1;
@@ -5254,6 +5264,7 @@ impl App {
                 });
                 if complete {
                     self.home.discover = std::mem::take(&mut self.home.discover_pending);
+                    self.store_made_for_you();
                 }
             }
             // A reload reads the playlists from the top again under a new
@@ -5268,9 +5279,20 @@ impl App {
                 Ok(page) => {
                     self.library.playlists_asked = None;
                     let next_offset = page.next_offset();
-                    match &mut self.library.playlists {
-                        Loadable::Loaded(existing) if offset > 0 => existing.extend(page.items),
-                        slot => *slot = Loadable::Loaded(page.items),
+                    if let Some(incoming) = self.library.playlists_incoming.as_mut() {
+                        if offset == 0 {
+                            incoming.clear();
+                        }
+                        incoming.extend(page.items);
+                        if next_offset.is_none() {
+                            let fresh = self.library.playlists_incoming.take().unwrap_or_default();
+                            self.library.playlists = Loadable::Loaded(fresh);
+                        }
+                    } else {
+                        match &mut self.library.playlists {
+                            Loadable::Loaded(existing) if offset > 0 => existing.extend(page.items),
+                            slot => *slot = Loadable::Loaded(page.items),
+                        }
                     }
                     self.library.playlists_next = next_offset;
                     if next_offset.is_some() {
@@ -5278,6 +5300,7 @@ impl App {
                     } else {
                         // Load folder order after all playlists arrive.
                         self.backend.send(Command::Rootlist);
+                        self.store_playlists();
                     }
                     if let Some(playlists) = self.library.playlists.get() {
                         for listed in playlists {
@@ -5297,7 +5320,10 @@ impl App {
                 }
                 Err(error) => {
                     self.library.playlists_asked = None;
-                    if offset == 0 {
+                    if self.library.playlists_incoming.take().is_some() {
+                        // The list shown stays; the next load tries again.
+                        log::warn!("playlist list refresh failed: {error}");
+                    } else if offset == 0 {
                         self.library.playlists = Loadable::Failed(error.to_string());
                     } else {
                         self.toast_error(
@@ -10200,6 +10226,71 @@ impl App {
         }
     }
 
+    /// Asks once per sign-in for the playlist list and "Made for you" saved
+    /// on disk, to show while the shared app answers (`library_cache`).
+    fn request_library_cache(&mut self) {
+        if self.library.cache_checked {
+            return;
+        }
+        let Some(account_id) = self.user_id().map(str::to_string) else {
+            return;
+        };
+        self.library.cache_checked = true;
+        self.backend.send(Command::LoadLibraryCache { account_id });
+    }
+
+    /// Shows what was saved wherever nothing fresher has arrived yet. The
+    /// load already on its way then replaces it once complete.
+    fn receive_library_cache(&mut self, account_id: &str, cache: crate::library_cache::Cache) {
+        if self.user_id() != Some(account_id) {
+            return;
+        }
+        if let Some(playlists) = cache.playlists.filter(|list| !list.is_empty())
+            && self.library.playlists.is_loading()
+        {
+            for playlist in &playlists {
+                self.saved.insert(playlist.uri.clone(), true);
+            }
+            self.library.playlists = Loadable::Loaded(playlists);
+            self.library.playlists_incoming = Some(Vec::new());
+        }
+        for (term, playlists) in cache.made_for_you.unwrap_or_default() {
+            let waiting = matches!(
+                self.home.discover.get(&term),
+                None | Some(Loadable::Loading)
+            );
+            if waiting && DISCOVER_TERMS.contains(&term.as_str()) {
+                self.home.discover.insert(term, Loadable::Loaded(playlists));
+            }
+        }
+    }
+
+    fn store_playlists(&self) {
+        if let (Some(account_id), Some(playlists)) = (self.user_id(), self.library.playlists.get())
+        {
+            self.backend.send(Command::StorePlaylistsCache(
+                crate::library_cache::Playlists::new(account_id, playlists.clone()),
+            ));
+        }
+    }
+
+    fn store_made_for_you(&self) {
+        let Some(account_id) = self.user_id() else {
+            return;
+        };
+        let made_for_you: std::collections::BTreeMap<String, Vec<Playlist>> = self
+            .home
+            .discover
+            .iter()
+            .filter_map(|(term, list)| list.get().map(|list| (term.clone(), list.clone())))
+            .collect();
+        if !made_for_you.is_empty() {
+            self.backend.send(Command::StoreMadeForYouCache(
+                crate::library_cache::MadeForYou::new(account_id, made_for_you),
+            ));
+        }
+    }
+
     fn receive_liked_cache(
         &mut self,
         account: &str,
@@ -11756,7 +11847,12 @@ mod tests {
             followed: true,
             result: Ok(()),
         });
-        assert!(app.library.playlists.is_loading());
+        let shown = playlist_ids(&["a", "b"]);
+        assert_eq!(
+            listed_playlists(&app),
+            shown,
+            "the list shown stays up while it reloads"
+        );
         let new = app.library.playlists_generation;
         assert_ne!(new, old, "a reload is a new load");
         app.handle_api(ApiResponse::MyPlaylists {
@@ -11764,8 +11860,9 @@ mod tests {
             generation: old,
             result: Ok(playlist_page(&["c"], 2, 3)),
         });
-        assert!(
-            app.library.playlists.is_loading(),
+        assert_eq!(
+            listed_playlists(&app),
+            shown,
             "the late page is not the reloaded list"
         );
         assert_eq!(app.library.playlists_next, None, "and asks for nothing");
@@ -11832,8 +11929,8 @@ mod tests {
         });
         assert_eq!(
             listed_playlists(&app),
-            playlist_ids(&["new", "a"]),
-            "the old load's page is not taken"
+            playlist_ids(&["a", "b"]),
+            "the old load's page is not taken, and the list shown waits for the whole new one"
         );
         assert_eq!(
             app.library.playlists_asked,
@@ -15090,6 +15187,86 @@ mod tests {
         let liked = &app.settings.recent_searches[0];
         assert_eq!(liked.uri, crate::settings::LIKED_SONGS_KEY);
         assert_eq!(liked.kind(), "liked-songs");
+        app.backend.shutdown();
+    }
+
+    /// The shared app can take half a minute to answer at startup, so the
+    /// playlist list saved last time shows meanwhile. The fresh list
+    /// replaces it whole once complete, and a failed refresh leaves it up.
+    #[test]
+    fn the_saved_playlist_list_shows_until_the_fresh_one_is_complete() {
+        let mut app = test_app("library-cache");
+        let account = "alice".to_string();
+        let user = User {
+            id: account.clone(),
+            ..User::default()
+        };
+        let list = |names: &[&str]| -> Vec<Playlist> {
+            names
+                .iter()
+                .map(|name| Playlist {
+                    id: (*name).into(),
+                    name: (*name).into(),
+                    uri: format!("spotify:playlist:{name}"),
+                    ..Playlist::default()
+                })
+                .collect()
+        };
+        let names = |app: &App| -> Vec<String> {
+            app.library
+                .playlists
+                .get()
+                .map(|playlists| playlists.iter().map(|p| p.name.clone()).collect())
+                .unwrap_or_default()
+        };
+        for refresh_fails in [false, true] {
+            app.reset_data();
+            app.user = Some(user.clone());
+            app.load_playlists();
+            assert!(app.library.playlists.is_loading());
+            app.receive_library_cache(
+                &account,
+                crate::library_cache::Cache {
+                    playlists: Some(list(&["saved a", "saved b"])),
+                    made_for_you: None,
+                },
+            );
+            assert_eq!(names(&app), ["saved a", "saved b"]);
+            let generation = app.library.playlists_generation;
+            let result = if refresh_fails {
+                Err(crate::api::ApiError::RateLimited)
+            } else {
+                Ok(crate::api::models::Page {
+                    items: list(&["fresh"]),
+                    ..Default::default()
+                })
+            };
+            app.handle_api(ApiResponse::MyPlaylists {
+                offset: 0,
+                generation,
+                result,
+            });
+            let expected: &[&str] = if refresh_fails {
+                &["saved a", "saved b"]
+            } else {
+                &["fresh"]
+            };
+            assert_eq!(names(&app), expected);
+            assert!(app.library.playlists_incoming.is_none());
+        }
+
+        // Another account's saved list never shows.
+        app.reset_data();
+        app.user = Some(user);
+        app.load_playlists();
+        app.receive_library_cache(
+            "someone-else",
+            crate::library_cache::Cache {
+                playlists: Some(list(&["theirs"])),
+                made_for_you: None,
+            },
+        );
+        assert!(app.library.playlists.is_loading());
         app.backend.shutdown();
     }
 
