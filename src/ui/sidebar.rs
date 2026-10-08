@@ -344,9 +344,10 @@ pub(crate) fn selected_sort(app: &App, shelf: Filter) -> LibrarySort {
     }
 }
 
-fn sort_menu(app: &mut App, ui: &mut egui::Ui, shelf: Filter, selected: LibrarySort) {
-    let locale = app.locale;
-    let labels = [
+/// Every sort the library offers, by name, in the order its menus list them.
+/// Settings offers the same choices, per shelf.
+pub(crate) fn sort_choices(locale: Locale) -> Vec<(LibrarySort, String)> {
+    [
         (LibrarySort::Library, gettext(locale, "Library order")),
         (
             LibrarySort::RecentlyPlayed,
@@ -362,55 +363,10 @@ fn sort_menu(app: &mut App, ui: &mut egui::Ui, shelf: Filter, selected: LibraryS
             LibrarySort::Spotify,
             gettext(locale, "Spotify custom order"),
         ),
-    ];
-    let label = &labels
-        .iter()
-        .find(|(sort, _)| *sort == selected)
-        .expect("sort label")
-        .1;
-    ui.add_space(4.0);
-    let response = ui.add(
-        egui::Button::image_and_text(
-            Icon::ChevronDown.image(app.palette.text, 15.0),
-            egui::RichText::new(label.as_ref()).font(theme::medium(13.0)),
-        )
-        .wrap()
-        .fill(app.palette.surface)
-        .corner_radius(12)
-        .min_size(vec2(0.0, 28.0)),
-    );
-    egui::Popup::menu(&response)
-        .frame(super::widgets::menu_frame(&app.palette))
-        .show(|ui| {
-            let width = labels
-                .iter()
-                .map(|(_, label)| {
-                    ui.painter()
-                        .layout_no_wrap(label.to_string(), theme::regular(13.5), app.palette.text)
-                        .size()
-                        .x
-                })
-                .fold(140.0_f32, f32::max)
-                + 52.0;
-            ui.set_width(width.min(ui.ctx().content_rect().width() - 24.0));
-            for (sort, label) in &labels {
-                if !sort.supports(shelf)
-                    || (*sort == LibrarySort::Library && shelf == Filter::Playlists)
-                    || (*sort == LibrarySort::Local && app.settings.sidebar_order.is_empty())
-                {
-                    continue;
-                }
-                if super::widgets::menu_item(
-                    ui,
-                    &app.palette,
-                    (*sort == selected).then_some(Icon::Check),
-                    label,
-                ) {
-                    app.actions
-                        .push(Action::SetLibrarySort { shelf, sort: *sort });
-                }
-            }
-        });
+    ]
+    .into_iter()
+    .map(|(sort, label)| (sort, label.into_owned()))
+    .collect()
 }
 
 fn saved_time(value: Option<&str>) -> Option<i64> {
@@ -993,7 +949,6 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
         }
     });
     let sort = selected_sort(app, filter);
-    sort_menu(app, ui, filter, sort);
     ui.data_mut(|data| {
         data.insert_temp(filter_id, filter);
         data.insert_temp(show_search_id, show_search);

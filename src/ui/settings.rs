@@ -1221,6 +1221,30 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         });
     }
 
+    let library = gettext(locale, "Library");
+    let library_rows = [
+        RowText::new(gettext(locale, "Playlists"), ""),
+        RowText::new(gettext(locale, "Albums"), ""),
+        RowText::new(gettext(locale, "Artists"), ""),
+        RowText::new(gettext(locale, "Podcasts"), ""),
+    ];
+    if section_matches(&needle, &library, &library_rows) {
+        any_visible = true;
+        section(ui, &palette, &library, |ui| {
+            let shelves = [
+                crate::settings::LibraryShelf::Playlists,
+                crate::settings::LibraryShelf::Albums,
+                crate::settings::LibraryShelf::Artists,
+                crate::settings::LibraryShelf::Podcasts,
+            ];
+            for (shelf, row) in shelves.into_iter().zip(&library_rows) {
+                filtered_row(ui, &palette, &needle, &library, row, |ui| {
+                    library_sort_picker(app, ui, shelf);
+                });
+            }
+        });
+    }
+
     let proxy = gettext(locale, "Proxy");
     let proxy_rows = [RowText::new(
         gettext(locale, "Mode, host, port, username and password"),
@@ -2036,6 +2060,46 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
 /// A band's frequency the short way: 60, 170, 1K, 16K.
 /// The interface language: System first, then each language by its own name,
 /// so a reader can find theirs whatever language the app is showing.
+/// How one library shelf is sorted, picked from the sorts it offers. The
+/// same choices the library's own menu offered before.
+fn library_sort_picker(app: &mut App, ui: &mut egui::Ui, shelf: crate::settings::LibraryShelf) {
+    use crate::settings::{LibraryShelf, LibrarySort};
+    let locale = app.locale;
+    let selected = super::sidebar::selected_sort(app, shelf);
+    let choices: Vec<(LibrarySort, String)> = super::sidebar::sort_choices(locale)
+        .into_iter()
+        .filter(|(sort, _)| {
+            sort.supports(shelf)
+                && !(*sort == LibrarySort::Library && shelf == LibraryShelf::Playlists)
+                && !(*sort == LibrarySort::Local && app.settings.sidebar_order.is_empty())
+        })
+        .collect();
+    let shown = choices
+        .iter()
+        .find(|(sort, _)| *sort == selected)
+        .map(|(_, label)| label.clone())
+        .unwrap_or_default();
+    let mut chosen = None;
+    egui::ComboBox::from_id_salt(("library-sort", format!("{shelf:?}")))
+        .selected_text(shown)
+        .width(200.0_f32.min(ui.available_width()))
+        .show_ui(ui, |ui| {
+            for (sort, label) in &choices {
+                if ui
+                    .selectable_label(*sort == selected, label.as_str())
+                    .clicked()
+                {
+                    chosen = Some(*sort);
+                }
+            }
+        });
+    if let Some(sort) = chosen
+        && sort != selected
+    {
+        app.actions.push(Action::SetLibrarySort { shelf, sort });
+    }
+}
+
 fn language_picker(app: &mut App, ui: &mut egui::Ui) {
     let locale = app.locale;
     let system = pgettext(locale, "language", "System");

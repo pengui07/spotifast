@@ -326,8 +326,8 @@ Portable archives identify themselves with `spotifast-portable.txt`.
 
 ## Library order
 
-Since 0.8.0, the menu below the Library filters selects an order
-for each section. **Name** and **Recently played** are available throughout.
+Since 0.8.0, Settings has a Library section that selects an order for each
+section. It is no longer a menu below the Library filters. **Name** and **Recently played** are available throughout.
 Albums and podcasts also offer **Recently added**, using their actual save
 dates. Spotify does not supply equivalent dates for followed playlists or
 artists, so those sections do not offer that choice. Entries with missing save
