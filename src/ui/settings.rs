@@ -890,8 +890,13 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 locale,
                 "Clicking the player bar's empty space switches between Off, Spectrum and Waveform.",
             ),
+        ),
+        RowText::new(
             faithful_visuals.clone(),
-            gettext(locale, "Use Spotify-style panels, navigation, and playback controls. Adds Now Playing view."),
+            gettext(
+                locale,
+                "Use Spotify-style panels, navigation, and playback controls. Adds Now Playing view.",
+            ),
         ),
     ];
     if section_matches(&needle, &appearance, &appearance_rows) {
