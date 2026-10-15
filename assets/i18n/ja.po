@@ -306,11 +306,11 @@ msgstr "全画面表示を終了 (Esc)"
 
 #: src/ui/player_bar.rs:1032 src/ui/lyrics.rs:787
 msgid "Close Now playing view (Esc)"
-msgstr ""
+msgstr "再生中ビューを閉じる (Esc)"
 
 #: src/ui/player_bar.rs:1039
 msgid "Now playing view"
-msgstr ""
+msgstr "再生中ビュー"
 
 #: src/ui/player_bar.rs:1073 src/ui/friends.rs:57
 msgid "Listening activity"
@@ -423,15 +423,15 @@ msgstr "読み込み中…"
 
 #: src/ui/lyrics.rs:799
 msgid "Full screen"
-msgstr ""
+msgstr "全画面表示"
 
 #: src/ui/lyrics.rs:819
 msgid "Show lyrics"
-msgstr ""
+msgstr "歌詞を表示"
 
 #: src/ui/lyrics.rs:821
 msgid "Hide lyrics"
-msgstr ""
+msgstr "歌詞を非表示"
 
 #: src/ui/friends.rs:110
 msgid "No listening activity"
@@ -1464,7 +1464,7 @@ msgstr "プレイヤーバーのビジュアライザー"
 
 #: src/ui/settings.rs:808
 msgid "Click to change visualizer"
-msgstr ""
+msgstr "クリックしてビジュアライザーを変更"
 
 #: src/ui/settings.rs:809
 msgid "Faithful UI"
@@ -1540,7 +1540,7 @@ msgstr ""
 msgid ""
 "Clicking the player bar's empty space switches between Off, Spectrum and "
 "Waveform."
-msgstr ""
+msgstr "プレイヤーバーの空いている場所をクリックすると、オフ、スペクトラム、波形が切り替わります。"
 
 #: src/ui/settings.rs:898
 msgid ""
@@ -1679,7 +1679,7 @@ msgstr "インストール済みのスキン"
 
 #: src/ui/settings.rs:1403 src/ui/settings.rs:1647
 msgid "Turn off to remove its button from the top bar and its shortcut."
-msgstr ""
+msgstr "オフにすると、上部バーのボタンとショートカットが削除されます。"
 
 #: src/ui/settings.rs:1424
 msgid "Switch to it"
@@ -1706,7 +1706,7 @@ msgstr "MilkDropウインドウ"
 
 #: src/ui/settings.rs:1557
 msgid "MilkDrop visualiser"
-msgstr ""
+msgstr "MilkDropビジュアライザー"
 
 #: src/ui/settings.rs:1565
 msgid ""

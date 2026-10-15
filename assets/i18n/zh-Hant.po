@@ -306,11 +306,11 @@ msgstr "退出全螢幕 (Esc)"
 
 #: src/ui/player_bar.rs:1032 src/ui/lyrics.rs:787
 msgid "Close Now playing view (Esc)"
-msgstr ""
+msgstr "關閉正在播放檢視 (Esc)"
 
 #: src/ui/player_bar.rs:1039
 msgid "Now playing view"
-msgstr ""
+msgstr "正在播放檢視"
 
 #: src/ui/player_bar.rs:1073 src/ui/friends.rs:57
 msgid "Listening activity"
@@ -423,15 +423,15 @@ msgstr "載入中…"
 
 #: src/ui/lyrics.rs:799
 msgid "Full screen"
-msgstr ""
+msgstr "全螢幕"
 
 #: src/ui/lyrics.rs:819
 msgid "Show lyrics"
-msgstr ""
+msgstr "顯示歌詞"
 
 #: src/ui/lyrics.rs:821
 msgid "Hide lyrics"
-msgstr ""
+msgstr "隱藏歌詞"
 
 #: src/ui/friends.rs:110
 msgid "No listening activity"
@@ -1433,7 +1433,7 @@ msgstr "播放列視覺效果"
 
 #: src/ui/settings.rs:808
 msgid "Click to change visualizer"
-msgstr ""
+msgstr "點擊切換視覺化效果"
 
 #: src/ui/settings.rs:809
 msgid "Faithful UI"
@@ -1503,7 +1503,7 @@ msgstr "歌曲在本機播放時，在播放列控制項後方顯示它的律動
 msgid ""
 "Clicking the player bar's empty space switches between Off, Spectrum and "
 "Waveform."
-msgstr ""
+msgstr "點擊播放列的空白區域可在關閉、頻譜和波形之間切換。"
 
 #: src/ui/settings.rs:898
 msgid ""
@@ -1634,7 +1634,7 @@ msgstr "已安裝的面板"
 
 #: src/ui/settings.rs:1403 src/ui/settings.rs:1647
 msgid "Turn off to remove its button from the top bar and its shortcut."
-msgstr ""
+msgstr "關閉後將移除頂端列中的按鈕及其快捷鍵。"
 
 #: src/ui/settings.rs:1424
 msgid "Switch to it"
@@ -1660,7 +1660,7 @@ msgstr "MilkDrop 視窗"
 
 #: src/ui/settings.rs:1557
 msgid "MilkDrop visualiser"
-msgstr ""
+msgstr "MilkDrop 視覺效果"
 
 #: src/ui/settings.rs:1565
 msgid ""

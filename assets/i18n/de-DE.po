@@ -310,11 +310,11 @@ msgstr "Vollbild verlassen (Esc)"
 
 #: src/ui/player_bar.rs:1032 src/ui/lyrics.rs:787
 msgid "Close Now playing view (Esc)"
-msgstr ""
+msgstr "Ansicht der aktuellen Wiedergabe schließen (Esc)"
 
 #: src/ui/player_bar.rs:1039
 msgid "Now playing view"
-msgstr ""
+msgstr "Ansicht der aktuellen Wiedergabe"
 
 #: src/ui/player_bar.rs:1073 src/ui/friends.rs:57
 msgid "Listening activity"
@@ -427,15 +427,15 @@ msgstr "Laden…"
 
 #: src/ui/lyrics.rs:799
 msgid "Full screen"
-msgstr ""
+msgstr "Vollbild"
 
 #: src/ui/lyrics.rs:819
 msgid "Show lyrics"
-msgstr ""
+msgstr "Songtext anzeigen"
 
 #: src/ui/lyrics.rs:821
 msgid "Hide lyrics"
-msgstr ""
+msgstr "Songtext ausblenden"
 
 #: src/ui/friends.rs:110
 msgid "No listening activity"
@@ -1478,7 +1478,7 @@ msgstr "Visualizer in der Wiedergabeleiste"
 
 #: src/ui/settings.rs:808
 msgid "Click to change visualizer"
-msgstr ""
+msgstr "Klicken, um den Visualizer zu wechseln"
 
 #: src/ui/settings.rs:809
 msgid "Faithful UI"
@@ -1558,7 +1558,7 @@ msgstr ""
 msgid ""
 "Clicking the player bar's empty space switches between Off, Spectrum and "
 "Waveform."
-msgstr ""
+msgstr "Ein Klick auf eine freie Stelle in der Wiedergabeleiste wechselt zwischen Aus, Spektrum und Wellenform."
 
 #: src/ui/settings.rs:898
 msgid ""
@@ -1696,7 +1696,7 @@ msgstr "Installierte Skins"
 
 #: src/ui/settings.rs:1403 src/ui/settings.rs:1647
 msgid "Turn off to remove its button from the top bar and its shortcut."
-msgstr ""
+msgstr "Deaktivieren, um die Schaltfläche aus der oberen Leiste und den Kurzbefehl zu entfernen."
 
 #: src/ui/settings.rs:1424
 msgid "Switch to it"
@@ -1724,7 +1724,7 @@ msgstr "MilkDrop-Fenster"
 
 #: src/ui/settings.rs:1557
 msgid "MilkDrop visualiser"
-msgstr ""
+msgstr "MilkDrop-Visualizer"
 
 #: src/ui/settings.rs:1565
 msgid ""

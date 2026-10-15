@@ -315,11 +315,11 @@ msgstr "Выйти из полноэкранного режима (Esc)"
 
 #: src/ui/player_bar.rs:1032 src/ui/lyrics.rs:787
 msgid "Close Now playing view (Esc)"
-msgstr ""
+msgstr "Закрыть окно текущего воспроизведения (Esc)"
 
 #: src/ui/player_bar.rs:1039
 msgid "Now playing view"
-msgstr ""
+msgstr "Окно текущего воспроизведения"
 
 #: src/ui/player_bar.rs:1073 src/ui/friends.rs:57
 msgid "Listening activity"
@@ -432,15 +432,15 @@ msgstr "Загрузка…"
 
 #: src/ui/lyrics.rs:799
 msgid "Full screen"
-msgstr ""
+msgstr "Полный экран"
 
 #: src/ui/lyrics.rs:819
 msgid "Show lyrics"
-msgstr ""
+msgstr "Показать текст"
 
 #: src/ui/lyrics.rs:821
 msgid "Hide lyrics"
-msgstr ""
+msgstr "Скрыть текст"
 
 #: src/ui/friends.rs:110
 msgid "No listening activity"
@@ -1479,7 +1479,7 @@ msgstr "Визуализатор в панели плеера"
 
 #: src/ui/settings.rs:808
 msgid "Click to change visualizer"
-msgstr ""
+msgstr "Нажмите, чтобы сменить визуализатор"
 
 #: src/ui/settings.rs:809
 msgid "Faithful UI"
@@ -1555,7 +1555,7 @@ msgstr ""
 msgid ""
 "Clicking the player bar's empty space switches between Off, Spectrum and "
 "Waveform."
-msgstr ""
+msgstr "Нажатие на пустое место панели воспроизведения переключает режимы: выключено, спектр и форма волны."
 
 #: src/ui/settings.rs:898
 msgid ""
@@ -1691,7 +1691,7 @@ msgstr "Установленные скины"
 
 #: src/ui/settings.rs:1403 src/ui/settings.rs:1647
 msgid "Turn off to remove its button from the top bar and its shortcut."
-msgstr ""
+msgstr "Выключите, чтобы убрать кнопку с верхней панели и отключить её сочетание клавиш."
 
 #: src/ui/settings.rs:1424
 msgid "Switch to it"
@@ -1717,7 +1717,7 @@ msgstr "Окно MilkDrop"
 
 #: src/ui/settings.rs:1557
 msgid "MilkDrop visualiser"
-msgstr ""
+msgstr "Визуализатор MilkDrop"
 
 #: src/ui/settings.rs:1565
 msgid ""

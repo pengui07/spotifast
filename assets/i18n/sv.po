@@ -310,11 +310,11 @@ msgstr "Lämna helskärm (Esc)"
 
 #: src/ui/player_bar.rs:1032 src/ui/lyrics.rs:787
 msgid "Close Now playing view (Esc)"
-msgstr ""
+msgstr "Stäng vyn Spelas nu (Esc)"
 
 #: src/ui/player_bar.rs:1039
 msgid "Now playing view"
-msgstr ""
+msgstr "Vyn Spelas nu"
 
 #: src/ui/player_bar.rs:1073 src/ui/friends.rs:57
 msgid "Listening activity"
@@ -427,15 +427,15 @@ msgstr "Läser in…"
 
 #: src/ui/lyrics.rs:799
 msgid "Full screen"
-msgstr ""
+msgstr "Helskärm"
 
 #: src/ui/lyrics.rs:819
 msgid "Show lyrics"
-msgstr ""
+msgstr "Visa låttext"
 
 #: src/ui/lyrics.rs:821
 msgid "Hide lyrics"
-msgstr ""
+msgstr "Dölj låttext"
 
 #: src/ui/friends.rs:110
 msgid "No listening activity"
@@ -1467,7 +1467,7 @@ msgstr "Visualisering i spelarfältet"
 
 #: src/ui/settings.rs:808
 msgid "Click to change visualizer"
-msgstr ""
+msgstr "Klicka för att byta visualisering"
 
 #: src/ui/settings.rs:809
 msgid "Faithful UI"
@@ -1540,7 +1540,7 @@ msgstr ""
 msgid ""
 "Clicking the player bar's empty space switches between Off, Spectrum and "
 "Waveform."
-msgstr ""
+msgstr "Klicka på ett tomt område i spelarfältet för att växla mellan Av, Spektrum och Vågform."
 
 #: src/ui/settings.rs:898
 msgid ""
@@ -1677,7 +1677,7 @@ msgstr "Installerade skins"
 
 #: src/ui/settings.rs:1403 src/ui/settings.rs:1647
 msgid "Turn off to remove its button from the top bar and its shortcut."
-msgstr ""
+msgstr "Stäng av för att ta bort knappen från det övre fältet och dess kortkommando."
 
 #: src/ui/settings.rs:1424
 msgid "Switch to it"
@@ -1703,7 +1703,7 @@ msgstr "MilkDrop-fönster"
 
 #: src/ui/settings.rs:1557
 msgid "MilkDrop visualiser"
-msgstr ""
+msgstr "MilkDrop-visualisering"
 
 #: src/ui/settings.rs:1565
 msgid ""

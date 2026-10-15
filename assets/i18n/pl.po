@@ -315,11 +315,11 @@ msgstr "Wyjdź z pełnego ekranu (Esc)"
 
 #: src/ui/player_bar.rs:1032 src/ui/lyrics.rs:787
 msgid "Close Now playing view (Esc)"
-msgstr ""
+msgstr "Zamknij widok Teraz odtwarzane (Esc)"
 
 #: src/ui/player_bar.rs:1039
 msgid "Now playing view"
-msgstr ""
+msgstr "Widok Teraz odtwarzane"
 
 #: src/ui/player_bar.rs:1073 src/ui/friends.rs:57
 msgid "Listening activity"
@@ -432,15 +432,15 @@ msgstr "Wczytywanie…"
 
 #: src/ui/lyrics.rs:799
 msgid "Full screen"
-msgstr ""
+msgstr "Pełny ekran"
 
 #: src/ui/lyrics.rs:819
 msgid "Show lyrics"
-msgstr ""
+msgstr "Pokaż tekst"
 
 #: src/ui/lyrics.rs:821
 msgid "Hide lyrics"
-msgstr ""
+msgstr "Ukryj tekst"
 
 #: src/ui/friends.rs:110
 msgid "No listening activity"
@@ -1481,7 +1481,7 @@ msgstr "Wizualizacja na pasku odtwarzacza"
 
 #: src/ui/settings.rs:808
 msgid "Click to change visualizer"
-msgstr ""
+msgstr "Kliknij, aby zmienić wizualizację"
 
 #: src/ui/settings.rs:809
 msgid "Faithful UI"
@@ -1558,7 +1558,7 @@ msgstr ""
 msgid ""
 "Clicking the player bar's empty space switches between Off, Spectrum and "
 "Waveform."
-msgstr ""
+msgstr "Kliknięcie pustego miejsca na pasku odtwarzania przełącza między wyłączoną wizualizacją, widmem i przebiegiem fali."
 
 #: src/ui/settings.rs:898
 msgid ""
@@ -1694,7 +1694,7 @@ msgstr "Zainstalowane skórki"
 
 #: src/ui/settings.rs:1403 src/ui/settings.rs:1647
 msgid "Turn off to remove its button from the top bar and its shortcut."
-msgstr ""
+msgstr "Wyłącz, aby usunąć przycisk z górnego paska i jego skrót klawiszowy."
 
 #: src/ui/settings.rs:1424
 msgid "Switch to it"
@@ -1721,7 +1721,7 @@ msgstr "Okno MilkDrop"
 
 #: src/ui/settings.rs:1557
 msgid "MilkDrop visualiser"
-msgstr ""
+msgstr "Wizualizacja MilkDrop"
 
 #: src/ui/settings.rs:1565
 msgid ""
