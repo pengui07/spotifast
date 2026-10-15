@@ -1477,7 +1477,7 @@ msgstr "Getrouwe interface"
 
 #: src/ui/settings.rs:823
 msgid "Use hearts for saved songs"
-msgstr ""
+msgstr "Hartjes gebruiken voor opgeslagen nummers"
 
 #: src/ui/settings.rs:834
 msgid "Follow system uses your Omarchy colours."
@@ -1563,7 +1563,7 @@ msgstr ""
 
 #: src/ui/settings.rs:917
 msgid "Show hearts instead of plus and check icons in Faithful UI."
-msgstr ""
+msgstr "Toon hartjes in plaats van plus- en vinkpictogrammen in de getrouwe interface."
 
 #: src/ui/settings.rs:1052
 msgid "Off"

@@ -1472,7 +1472,7 @@ msgstr "Interface fiel"
 
 #: src/ui/settings.rs:823
 msgid "Use hearts for saved songs"
-msgstr ""
+msgstr "Usar corações para músicas salvas"
 
 #: src/ui/settings.rs:834
 msgid "Follow system uses your Omarchy colours."
@@ -1558,7 +1558,7 @@ msgstr ""
 
 #: src/ui/settings.rs:917
 msgid "Show hearts instead of plus and check icons in Faithful UI."
-msgstr ""
+msgstr "Mostrar corações em vez dos ícones de mais e de confirmação na interface fiel."
 
 #: src/ui/settings.rs:1052
 msgid "Off"

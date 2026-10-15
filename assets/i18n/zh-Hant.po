@@ -1435,7 +1435,7 @@ msgstr "忠實介面"
 
 #: src/ui/settings.rs:823
 msgid "Use hearts for saved songs"
-msgstr ""
+msgstr "為已儲存的歌曲使用愛心"
 
 #: src/ui/settings.rs:834
 msgid "Follow system uses your Omarchy colours."
@@ -1511,7 +1511,7 @@ msgstr "使用 Spotify 風格的面板、導覽和播放控制項，並新增現
 
 #: src/ui/settings.rs:917
 msgid "Show hearts instead of plus and check icons in Faithful UI."
-msgstr ""
+msgstr "在忠實介面中，使用愛心圖示取代加號和勾選圖示。"
 
 #: src/ui/settings.rs:1052
 msgid "Off"

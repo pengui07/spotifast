@@ -1469,7 +1469,7 @@ msgstr "Troget gränssnitt"
 
 #: src/ui/settings.rs:823
 msgid "Use hearts for saved songs"
-msgstr ""
+msgstr "Använd hjärtan för sparade låtar"
 
 #: src/ui/settings.rs:834
 msgid "Follow system uses your Omarchy colours."
@@ -1552,7 +1552,7 @@ msgstr ""
 
 #: src/ui/settings.rs:917
 msgid "Show hearts instead of plus and check icons in Faithful UI."
-msgstr ""
+msgstr "Visa hjärtan i stället för plus- och bockikoner i det trogna gränssnittet."
 
 #: src/ui/settings.rs:1052
 msgid "Off"

@@ -1466,7 +1466,7 @@ msgstr "忠実なUI"
 
 #: src/ui/settings.rs:823
 msgid "Use hearts for saved songs"
-msgstr ""
+msgstr "保存した曲にハートを使用"
 
 #: src/ui/settings.rs:834
 msgid "Follow system uses your Omarchy colours."
@@ -1552,7 +1552,7 @@ msgstr ""
 
 #: src/ui/settings.rs:917
 msgid "Show hearts instead of plus and check icons in Faithful UI."
-msgstr ""
+msgstr "忠実なUIで、プラスとチェックのアイコンの代わりにハートを表示します。"
 
 #: src/ui/settings.rs:1052
 msgid "Off"
