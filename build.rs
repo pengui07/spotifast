@@ -46,6 +46,7 @@ fn glew_library(lib: &std::path::Path) -> Option<&'static str> {
 /// window, the tray and the logo in the app, and `local/app-icon.ico` for the
 /// Windows executable. `local/` is never committed.
 const LOCAL_ICON_PNG: &str = "local/app-icon.png";
+#[cfg(windows)]
 const LOCAL_ICON_ICO: &str = "local/app-icon.ico";
 
 /// Hands the local icon, or nothing, to `util::app_icon_rgba`.
