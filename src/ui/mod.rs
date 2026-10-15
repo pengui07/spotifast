@@ -973,7 +973,7 @@ mod tests {
                 let (cover_id, cover) = button("Now playing view");
                 let settings = button("Settings").1.bounds().unwrap();
                 let mini = button(if cfg!(target_os = "macos") {
-                    "Winamp mini player (Cmd+M)"
+                    "Winamp mini player (Cmd+Shift+M)"
                 } else {
                     "Winamp mini player (Ctrl+M)"
                 })
