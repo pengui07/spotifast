@@ -8849,6 +8849,19 @@ mod tests {
             let original = app.settings.sidebar_order.clone();
             accessible_frame(&ctx, &mut app, vec![]);
             let tree = accessible_frame(&ctx, &mut app, vec![]);
+            // The default Library now includes albums and podcasts after the
+            // playlists. Select Playlists to test scrolling to its last row.
+            let category = accessible_node(&tree, "Playlists", Role::Button);
+            accessible_frame(
+                &ctx,
+                &mut app,
+                vec![accessible_action(
+                    category,
+                    egui::accesskit::Action::Click,
+                    None,
+                )],
+            );
+            let tree = accessible_frame(&ctx, &mut app, vec![]);
             let first = accessible_node(&tree, "Target 0", Role::Button);
             let bounds = tree
                 .nodes
@@ -9612,7 +9625,7 @@ mod tests {
                             .expect("the panel was drawn")
                             .outer_rect
                     };
-                    let side = rect(&format!("{panel}-panel"));
+                    let side = rect(crate::ui::RIGHT_PANEL_ID);
                     let header = rect("main-header");
                     let player = rect("player-bar");
                     assert_eq!(side.top(), header.bottom(), "{panel} at {width} in {theme}");
@@ -9659,7 +9672,7 @@ mod tests {
                             .expect("the panel was drawn")
                             .outer_rect
                     };
-                    let side = rect(&format!("{panel}-panel"));
+                    let side = rect(crate::ui::RIGHT_PANEL_ID);
                     let library = rect("sidebar");
                     let player = rect("player-bar");
                     assert_eq!(side.top(), library.top(), "{panel} at {width} in {theme}");

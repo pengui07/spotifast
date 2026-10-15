@@ -52,7 +52,7 @@ fn lead_id() -> egui::Id {
 }
 
 /// The narrowest the bar, and so the page under it, can be before its
-/// controls run into each other: a readable field, with the spinner and
+/// controls run into each other: the narrowest field, with the spinner and
 /// both badges as icons. Counting them even while they are away keeps the
 /// panels and the window from changing width as they come and go.
 pub fn least_width(ctx: &egui::Context) -> f32 {
@@ -63,7 +63,7 @@ pub fn least_width(ctx: &egui::Context) -> f32 {
 }
 
 fn least_width_after(lead: f32) -> f32 {
-    lead + SEARCH_FLOOR
+    lead + SEARCH_MIN
         + RIGHT_CONTROLS_WIDTH
         + SPINNER_SIZE
         + ITEM_SPACING
@@ -697,8 +697,9 @@ mod topbar_fit_tests {
     // Collapsed, a badge is a square chip as tall as its text.
     const CHIP: f32 = ITEM_SPACING + 15.0 + BADGE_PADDING_Y;
 
-    /// The minimum room reserved after navigation, including the additional
-    /// Listening activity button, spinner, and both collapsed badges.
+    /// Room for the normal reading width, including Listening activity,
+    /// the spinner, and both collapsed badges. Narrower tiled windows use
+    /// the existing SEARCH_MIN fallback, tested separately below.
     const NARROWEST_BAR: f32 =
         SEARCH_FLOOR + RIGHT_CONTROLS_WIDTH + SPINNER_SIZE + ITEM_SPACING + CHIP * 2.0;
 
@@ -756,7 +757,7 @@ mod topbar_fit_tests {
     }
 
     /// At the least width the panels leave it, the bar still holds the
-    /// spinner and both badges beside a readable field (#624).
+    /// spinner and both badges beside the narrow fallback field (#624).
     #[test]
     fn the_least_width_holds_every_control_beside_the_field() {
         let lead = LEAD_GUESS;
@@ -764,7 +765,7 @@ mod topbar_fit_tests {
         let controls = RIGHT_CONTROLS_WIDTH + SPINNER_SIZE + ITEM_SPACING;
         let fit = topbar_fit(room, controls, DEVICE + UPDATE, CHIP * 2.0);
         assert!(!fit.labels);
-        assert_eq!(fit.search, SEARCH_FLOOR);
+        assert_eq!(fit.search, SEARCH_MIN);
         assert!(controls + CHIP * 2.0 + fit.search <= room);
     }
 
