@@ -50,6 +50,12 @@
     <control>keyboard</control>
   </supports>
   <releases>
+    <release version="0.1.0" date="2026-10-15">
+      <url>https://github.com/pengui07/spotifast/releases/tag/v0.1.0</url>
+      <description>
+        <p>The first stable Pengui release adds a combined Library, collapsible side panel, and optional heart controls.</p>
+      </description>
+    </release>
     <release version="0.1.0-pengui" date="2026-10-15" type="development">
       <url>https://github.com/pengui07/spotifast/releases/tag/v0.1.0-pengui</url>
     </release>
