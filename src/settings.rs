@@ -1578,6 +1578,8 @@ pub struct SessionState {
     pub rootlist: Option<CachedRootlist>,
     /// Shuffle mode saved across contexts and restarts.
     pub shuffle_on: bool,
+    /// Repeat mode saved across restarts: `off`, `context`, or `track`.
+    pub repeat_mode: String,
     /// Each table's chosen sort, by encoded page, restored at start.
     pub sorts: Vec<(String, crate::model::TableSort)>,
     /// Last window inner size, to restore on next launch.
@@ -1645,6 +1647,22 @@ mod session_tests {
         let state: SessionState = serde_json::from_str(r#"{"last_page":"home"}"#).unwrap();
         assert_eq!(state.last_page.as_deref(), Some("home"));
         assert_eq!(state.rootlist, None);
+        assert_eq!(
+            crate::player::RepeatMode::from_api(&state.repeat_mode),
+            crate::player::RepeatMode::Off
+        );
+    }
+
+    #[test]
+    fn every_repeat_mode_round_trips() {
+        for mode in ["off", "context", "track"] {
+            let state = SessionState {
+                repeat_mode: mode.into(),
+                ..SessionState::default()
+            };
+            let json = serde_json::to_string(&state).unwrap();
+            assert_eq!(serde_json::from_str::<SessionState>(&json).unwrap(), state);
+        }
     }
 
     #[test]

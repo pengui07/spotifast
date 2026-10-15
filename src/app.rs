@@ -498,6 +498,7 @@ pub struct App {
     intent_track: Option<TrackIntent>,
     /// Requested shuffle mode, applied to every context until changed.
     shuffle_wanted: bool,
+    repeat_wanted: RepeatMode,
     /// Last local shuffle change, used to ignore its echo from the engine.
     shuffle_set_at: Option<Instant>,
     /// When tracks recently came up unavailable, to spot a key-service
@@ -796,7 +797,10 @@ impl App {
             local_transfer_sequence: None,
             local_ready: false,
             local_playback: LocalPlayback::Unavailable,
-            local: LocalState::default(),
+            local: LocalState {
+                repeat: RepeatMode::from_api(&session.repeat_mode),
+                ..LocalState::default()
+            },
             remote: None,
             remote_polled_at: Instant::now() - REMOTE_POLL_IDLE,
             remote_poll_pending: false,
@@ -926,6 +930,7 @@ impl App {
             optimistic_playing: None,
             intent_track: None,
             shuffle_wanted: session.shuffle_on,
+            repeat_wanted: RepeatMode::from_api(&session.repeat_mode),
             shuffle_set_at: None,
             unavailable_at: Vec::new(),
             last_unavailable_reconnect: None,
@@ -1611,7 +1616,7 @@ impl App {
             playing: false,
             loading: false,
             shuffle: self.shuffle_wanted,
-            repeat: RepeatMode::Off,
+            repeat: self.repeat_wanted,
             volume_percent: volume_to_percent(self.local.volume),
             can_control: true,
             can_set_volume: true,
@@ -2265,7 +2270,14 @@ impl App {
             .sum()
     }
 
-    fn handle_local(&mut self, state: LocalState) {
+    fn handle_local(&mut self, mut state: LocalState) {
+        if state.track.is_none() {
+            // An idle engine starts with repeat off. Keep the saved choice
+            // until playback starts and can report its actual mode.
+            state.repeat = self.repeat_wanted;
+        } else {
+            self.repeat_wanted = state.repeat;
+        }
         if self
             .local_transfer_sequence
             .is_some_and(|sequence| sequence != state.track_sequence)
@@ -5184,6 +5196,11 @@ impl App {
                     // A newer request supersedes this response.
                     return;
                 }
+                if self.resume_only() && matches!(self.queue, Loadable::Loaded(_)) {
+                    // A request started before restoration can still answer
+                    // after it. Only live playback may replace the saved rows.
+                    return;
+                }
                 // Partial reads and read failures must preserve optimistic
                 // additions while Spotify is still accepting their writes.
                 let writing_queue = self
@@ -7590,6 +7607,8 @@ impl App {
     }
 
     fn set_repeat(&mut self, mode: RepeatMode) {
+        self.repeat_wanted = mode;
+        self.session_dirty = true;
         match self.target() {
             Target::Local => {
                 self.local.repeat = mode;
@@ -10338,7 +10357,10 @@ impl App {
         self.session_dirty = false;
         self.last_session_save = Instant::now();
         if let Some(now) = self.now_playing() {
-            self.resume_context = self.playing_context_uri();
+            self.repeat_wanted = now.repeat;
+            if !now.resuming {
+                self.resume_context = self.playing_context_uri();
+            }
             self.resume_track = Some(now.uri.clone());
             self.resume_position_ms = now.position_ms;
         }
@@ -10360,9 +10382,10 @@ impl App {
                 last_queue_rows: self
                     .queue
                     .get()
-                    .map(|queue| queue.queue.iter().take(30).cloned().collect())
+                    .map(|queue| queue.queue.clone())
                     .unwrap_or_default(),
                 shuffle_on: self.shuffle_wanted,
+                repeat_mode: self.repeat_wanted.api_name().to_string(),
                 sorts: self
                     .table_sorts
                     .iter()
@@ -17183,30 +17206,62 @@ mod tests {
         );
         app.local_ready = true;
         app.resume_track = Some("spotify:track:a".into());
+        app.resume_context = Some("spotify:playlist:saved".into());
+        app.set_repeat(RepeatMode::Track);
         app.manual_queue = vec!["spotify:track:b".into()];
         app.queue = loaded_queue(
             "spotify:track:a",
             &["spotify:track:b", "spotify:track:ctx1"],
         );
+        if let Loadable::Loaded(queue) = &mut app.queue {
+            queue
+                .queue
+                .extend((0..40).map(|_| queued_song("spotify:track:duplicate")));
+        }
         app.save_session();
+        app.backend.shutdown();
 
         let options = AppOptions {
             media_controls: false,
             restore_sign_in: false,
             tray: false,
         };
-        let app = App::new(&Waker::default(), dirs, Settings::default(), options);
+        let mut app = App::new(&Waker::default(), dirs, Settings::default(), options);
         let (_, next) = queue_uris(&app);
         assert_eq!(
-            next,
+            next[..2],
             vec!["spotify:track:b", "spotify:track:ctx1"],
             "the queue is shown as it was left"
+        );
+        assert_eq!(next.len(), 42, "rows beyond thirty and duplicates survive");
+        app.handle_api(ApiResponse::Queue {
+            seq: app.queue_seq,
+            result: Ok(Queue {
+                currently_playing: None,
+                queue: Vec::new(),
+            }),
+        });
+        assert_eq!(
+            queue_uris(&app).1,
+            next,
+            "an idle reply keeps the saved queue"
         );
         assert_eq!(
             app.queued_rows_len(),
             1,
             "the remembered hand-queued song keeps its own section"
         );
+        assert_eq!(app.repeat_wanted, RepeatMode::Track);
+        app.handle_local(LocalState::default());
+        assert_eq!(app.local.repeat, RepeatMode::Track);
+        app.local_ready = true;
+        app.local.connected = true;
+        app.resume_last();
+        assert!(app.backend.take_player_commands().iter().any(|command| {
+            matches!(command, PlayerCommand::Load(load) if load.repeat == Some(RepeatMode::Track))
+        }));
+        app.backend.shutdown();
+        let _ = std::fs::remove_dir_all(root);
     }
 
     /// Saving the queue writes the playing song and every row after it,

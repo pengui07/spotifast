@@ -117,6 +117,9 @@ not consume a queue row or restore an older queue saved on this computer.
 
 9. **Closing the app keeps the queue.** Spotifast saves it locally. When you
    resume the last song, it restores your queued songs and playlist position.
+   All displayed queue rows, including repeated songs, remain visible on reopening.
+   An idle startup response cannot clear them. Repeat Off, Repeat context, and
+   Repeat track are also remembered and applied when local playback resumes.
 
 10. **Old answers from Spotify are ignored.** Queue responses can be a few
     seconds late. Spotifast ignores stale responses and asks again. Your
