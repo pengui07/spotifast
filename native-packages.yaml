@@ -13,7 +13,7 @@ libraries:
 nfpm:
   name: spotifast
   maintainer: Carmine Paolino <carmine@paolino.me>
-  homepage: https://github.com/crmne/spotifast
+  homepage: https://github.com/pengui07/spotifast
   description: A native Spotify client
   license: MIT
   contents:
@@ -127,7 +127,7 @@ targets:
       local: dist/spotifast-v@VERSION@-aarch64-unknown-linux-gnu.tar.gz
       release_asset: spotifast-v@VERSION@-aarch64-unknown-linux-gnu.tar.gz
 release:
-  repository: crmne/spotifast
+  repository: pengui07/spotifast
   prereleases: true
   checksums: checksums.txt
 assets:

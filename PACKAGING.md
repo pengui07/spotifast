@@ -1,5 +1,17 @@
 # Packaging
 
+This fork publishes releases from `pengui07/spotifast`. Its updater currently
+verifies the release's `checksums.txt` without a publisher signature, matching
+`publisher_key: None` in `src/updates.rs`. The fork release workflow therefore
+does not need the upstream signing secret. Tags containing a suffix, such as
+`v0.1.0-pengui`, publish prereleases and skip website and package-repository
+updates. The ordinary updater checks stable releases, so install prereleases
+from GitHub manually.
+
+Before changing a release version, run the **Nix vendor hash** workflow with
+the new Cargo version. Copy its calculated hash into `flake.nix`, then let
+the full Nix CI job verify the final release commit before pushing its tag.
+
 [`native-packages.yaml`](native-packages.yaml) is the packaging configuration:
 it pins the shared CLI and nFPM versions and declares Linux amd64/arm64 inputs,
 DEB/RPM/AppImage contents, dependencies, recipe templates and downstream repositories.
