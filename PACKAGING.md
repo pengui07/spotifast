@@ -86,6 +86,10 @@ runs `spotifast --version`, loads the GUI libraries with `dlopen`, and
 verifies the desktop entry and icon. They cover installation and library
 resolution, not a running desktop or Spotify playback. On release runs these
 checks follow artifact attachment; a failure marks the workflow as failed.
+The fork's pinned fixture is fetched from upstream and verified against its
+published checksums before being passed as local build inputs. Its temporary
+Homebrew validation cask uses that upstream URL; actual release recipes use
+the fork's downloads.
 The generated Homebrew cask is also installed, launched with `--version`,
 signature-checked, and uninstalled on a native macOS runner. Wait for this
 check before publishing the staged cask to the tap.
