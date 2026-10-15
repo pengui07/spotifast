@@ -1,0 +1,67 @@
+name: Nix vendor hash
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version to prepare before committing a release
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  hash:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: cachix/install-nix-action@v31
+      - name: Prepare the requested version in the disposable checkout
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import re
+          import tomllib
+
+          version = os.environ['RELEASE_VERSION']
+          if not re.fullmatch(r'\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?', version):
+              raise SystemExit('Expected a package version')
+          manifest = Path('Cargo.toml')
+          text = manifest.read_text()
+          old = tomllib.loads(text)['package']['version']
+          manifest.write_text(text.replace(f'version = "{old}"', f'version = "{version}"', 1))
+          lock = Path('Cargo.lock')
+          text, count = re.subn(
+              r'(\[\[package\]\]\nname = "spotifast"\nversion = ")[^"]+',
+              lambda match: match[1] + version, lock.read_text(), count=1)
+          if count != 1:
+              raise SystemExit('Could not find Spotifast in Cargo.lock')
+          lock.write_text(text)
+          # Force verification instead of accepting an existing fixed-output cache.
+          flake = Path('flake.nix')
+          flake.write_text(re.sub(r'hash = "sha256-[^"]+";',
+                                  'hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";',
+                                  flake.read_text(), count=1))
+          PY
+      - name: Calculate the vendor hash
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        shell: bash
+        run: |
+          set +e
+          nix build .#packages.x86_64-linux.default.cargoDeps --no-link 2>&1 | tee vendor.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo 'Expected the deliberately empty hash to fail verification.' >&2
+            exit 1
+          fi
+          hash=$(sed -n 's/.*got: *\(sha256-[A-Za-z0-9+/=]*\).*/\1/p' vendor.log | tail -1)
+          test -n "$hash"
+          printf 'Vendor hash for %s: `%s`\n' "$RELEASE_VERSION" "$hash" >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' "$hash"
