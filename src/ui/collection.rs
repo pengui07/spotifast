@@ -178,8 +178,12 @@ pub fn actions_row(
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 18.0;
         if let Some(uri) = &actions.play_uri {
-            let now_playing_here = app.playing_context_uri().as_deref() == Some(uri.as_str())
-                && app.believed_playing();
+            let active_here = app.playing_context_uri().as_deref() == Some(uri.as_str());
+            let now_playing_here = active_here && app.believed_playing();
+            // A paused playlist still owns its current song and queue.
+            // Resume it instead of loading a fresh (possibly shuffled) list.
+            let toggle_here =
+                now_playing_here || (active_here && uri.starts_with("spotify:playlist:"));
             let is_filtered = filter.as_ref().is_some_and(|f| !f.trim().is_empty());
             // A radio is mixed afresh each time Spotify is asked, so it
             // always plays the songs on screen.
@@ -200,7 +204,7 @@ pub fn actions_row(
                     &gettext(locale, "Starting…"),
                 );
             } else if ui
-                .add_enabled_ui(now_playing_here || can_start, |ui| {
+                .add_enabled_ui(toggle_here || can_start, |ui| {
                     theme::circle_button(
                         ui,
                         icon,
@@ -219,7 +223,7 @@ pub fn actions_row(
                 .on_disabled_hover_text(gettext(locale, "No playable songs in this view").as_ref())
                 .clicked()
             {
-                if now_playing_here {
+                if toggle_here {
                     app.actions.push(Action::TogglePlay);
                 } else if let Some(uris) = actions.view.clone()
                     && play_view
@@ -3585,6 +3589,62 @@ mod tests {
             "shuffle must not start playback: {:?}",
             app.actions
         );
+    }
+
+    #[cfg(feature = "demo")]
+    #[test]
+    fn an_active_playlists_big_button_toggles_without_reloading() {
+        use egui::accesskit::{Action as AccessibleAction, ActionRequest, Role, TreeId};
+
+        for playing in [false, true] {
+            for shuffle in [false, true] {
+                let ctx = egui::Context::default();
+                ctx.enable_accesskit();
+                let mut app = test_app();
+                app.attach(&ctx);
+                crate::demo::populate(&mut app);
+                app.apply(Action::SetShuffle(shuffle), &ctx);
+                let remote = app.remote.as_mut().unwrap();
+                remote.state.is_playing = playing;
+                remote.state.context.as_mut().unwrap().uri = "spotify:playlist:pl1".into();
+                app.actions.clear();
+                let before = app.queue.get().unwrap().queue.clone();
+                let mut draw = |events| {
+                    let mut output = ctx.run_ui(
+                        egui::RawInput {
+                            screen_rect: Some(egui::Rect::from_min_size(
+                                egui::Pos2::ZERO,
+                                egui::vec2(1280.0, 800.0),
+                            )),
+                            events,
+                            ..Default::default()
+                        },
+                        |ui| playlist(&mut app, ui, "pl1"),
+                    );
+                    output.textures_delta.clear();
+                    output.platform_output.accesskit_update.unwrap()
+                };
+                draw(Vec::new());
+                let tree = draw(Vec::new());
+                let label = if playing { "Pause" } else { "Play" };
+                let button = tree
+                    .nodes
+                    .iter()
+                    .find(|(_, node)| node.role() == Role::Button && node.label() == Some(label))
+                    .expect("the playlist play/pause button")
+                    .0;
+                draw(vec![egui::Event::AccessKitActionRequest(ActionRequest {
+                    target_tree: TreeId::ROOT,
+                    target_node: button,
+                    action: AccessibleAction::Click,
+                    data: None,
+                })]);
+                assert!(matches!(app.actions.as_slice(), [Action::TogglePlay]));
+                assert_eq!(app.queue.get().unwrap().queue, before);
+                app.backend.shutdown();
+                let _ = std::fs::remove_dir_all(app.dirs.config.parent().unwrap());
+            }
+        }
     }
 
     #[test]

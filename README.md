@@ -30,6 +30,7 @@ cannot play music through Spotifast.
 This fork checks for and downloads app updates from
 [pengui07/spotifast releases](https://github.com/pengui07/spotifast/releases).
 The queue and Repeat selection are remembered when you close and reopen the app.
+An active playlist's big Play button resumes its current song and queue.
 
 ![Spotifast Home with the playlist library, recommendations, queue, and player visible](docs/screenshot.png)
 

@@ -22,6 +22,8 @@ Starting and resuming are separate actions. With Shuffle off, a playlist's
 **Play** button starts at its first available song in the selected order.
 Double-clicking a row starts there, including with Shuffle on. **Play** in
 the player bar resumes the current song at its paused position.
+When a playlist is already active, its big button pauses or resumes the current
+song without restarting the playlist or changing the queue, including in Shuffle.
 
 Since 0.10.0, the Shuffle button on a collection page changes the
 global playback mode without starting that collection. It can be selected
