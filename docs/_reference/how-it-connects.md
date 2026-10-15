@@ -140,7 +140,8 @@ current-track pickup.
 - Spotifast has no telemetry, analytics, or hosted service. When the lyrics
   panel is open and Spotify has no lyrics, it sends the track's artist, title,
   album, and length to [lrclib.net](https://lrclib.net). It also checks
-  api.github.com once a day for updates. You can turn off automatic checks in
+  api.github.com once a day for updates from
+  [pengui07/spotifast](https://github.com/pengui07/spotifast/releases). You can turn off automatic checks in
   Settings, or request one there at any time. On macOS, **Check for Updates**
   is also in the application menu.
 

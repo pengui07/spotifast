@@ -27,6 +27,9 @@ Spotifast is a Spotify client written in Rust with
 **Playback needs Spotify Premium.** Free accounts can browse and search, but
 cannot play music through Spotifast.
 
+This fork checks for and downloads app updates from
+[pengui07/spotifast releases](https://github.com/pengui07/spotifast/releases).
+
 ![Spotifast Home with the playlist library, recommendations, queue, and player visible](docs/screenshot.png)
 
 <details>
