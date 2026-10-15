@@ -16,6 +16,19 @@ pub const CARD_WIDTH: f32 = 172.0;
 pub const CARD_GAP: f32 = 14.0;
 pub const PAGE_PADDING: f32 = 24.0;
 
+/// Keep saved-song icons consistent across rows, menus, and playback views.
+pub fn saved_track_icon(app: &App, saved: bool) -> Icon {
+    match (
+        app.settings.faithful_visuals && !app.settings.faithful_heart_icons,
+        saved,
+    ) {
+        (true, true) => Icon::CircleCheck,
+        (true, false) => Icon::CirclePlus,
+        (false, true) => Icon::HeartFilled,
+        (false, false) => Icon::Heart,
+    }
+}
+
 /// Draws an image (or a placeholder) in a square.
 pub fn cover(
     ui: &mut Ui,
@@ -642,20 +655,12 @@ pub fn picked_menu(
     let all_saved = uris.iter().all(|uri| app.is_saved(uri).unwrap_or(false));
     let (icon, text) = if all_saved {
         (
-            if app.settings.faithful_visuals {
-                Icon::CircleCheck
-            } else {
-                Icon::HeartFilled
-            },
+            saved_track_icon(app, true),
             gettext(locale, "Remove from Liked Songs"),
         )
     } else {
         (
-            if app.settings.faithful_visuals {
-                Icon::CirclePlus
-            } else {
-                Icon::Heart
-            },
+            saved_track_icon(app, false),
             gettext(locale, "Save to Liked Songs"),
         )
     };
@@ -884,20 +889,12 @@ pub fn item_menu(
         let saved = app.is_saved(&uri).unwrap_or(false);
         let (icon, text) = if saved {
             (
-                if app.settings.faithful_visuals {
-                    Icon::CircleCheck
-                } else {
-                    Icon::HeartFilled
-                },
+                saved_track_icon(app, true),
                 gettext(locale, "Remove from Liked Songs"),
             )
         } else {
             (
-                if app.settings.faithful_visuals {
-                    Icon::CirclePlus
-                } else {
-                    Icon::Heart
-                },
+                saved_track_icon(app, false),
                 gettext(locale, "Save to Liked Songs"),
             )
         };
@@ -1800,23 +1797,9 @@ fn track_row_contents(
                 child.set_opacity(0.0);
             }
             let (icon, color) = if saved == Some(true) {
-                (
-                    if app.settings.faithful_visuals {
-                        Icon::CircleCheck
-                    } else {
-                        Icon::HeartFilled
-                    },
-                    palette.accent,
-                )
+                (saved_track_icon(app, true), palette.accent)
             } else {
-                (
-                    if app.settings.faithful_visuals {
-                        Icon::CirclePlus
-                    } else {
-                        Icon::Heart
-                    },
-                    palette.secondary,
-                )
+                (saved_track_icon(app, false), palette.secondary)
             };
             let tooltip = if saved == Some(true) {
                 gettext(app.locale, "Remove from Liked Songs")

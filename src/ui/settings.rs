@@ -5,7 +5,7 @@ use egui::{Align, CornerRadius, Frame, Layout, Margin, Stroke, Vec2};
 use crate::api::models::pick_image;
 use crate::app::App;
 use crate::i18n::{gettext, ngettext, pgettext};
-use crate::model::{Action, Dialog};
+use crate::model::{Action, Dialog, Page};
 use crate::settings::{LanguageChoice, ProxyMode, ThemeChoice};
 use crate::theme::{self, Icon, Palette};
 
@@ -14,6 +14,19 @@ use super::widgets;
 const PLAYBACK_DIRTY_ID: &str = "playback-settings-dirty";
 pub(crate) const PERSONAL_APP_FOCUS_ID: &str = "focus-personal-app-setup";
 const SETTINGS_FILTER_ID: &str = "settings-filter";
+
+/// The Settings buttons return to the previous page when already open.
+pub(super) fn toggle_action(app: &App) -> Action {
+    if matches!(app.page(), Page::Settings) {
+        if app.can_go_back() {
+            Action::Back
+        } else {
+            Action::Open(Page::Home)
+        }
+    } else {
+        Action::Open(Page::Settings)
+    }
+}
 
 /// Whether a settings row matches the filter query (case-insensitive).
 /// An empty query matches everything, so the page reads exactly as
@@ -807,6 +820,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     let player_bar_vis = gettext(locale, "Player bar visualizer");
     let player_bar_vis_click = gettext(locale, "Click to change visualizer");
     let faithful_visuals = gettext(locale, "Faithful UI");
+    let faithful_hearts = gettext(locale, "Use hearts for saved songs");
     let appearance_rows = [
         RowText::new(theme_title.clone(), {
             let detail = theme::catalog_detail(
@@ -898,6 +912,11 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                 "Use Spotify-style panels, navigation, and playback controls. Adds Now Playing view.",
             ),
         ),
+        RowText::new(
+            faithful_hearts.clone(),
+            gettext(locale, "Show hearts instead of plus and check icons in Faithful UI."),
+        )
+        .when(app.settings.faithful_visuals),
     ];
     if section_matches(&needle, &appearance, &appearance_rows) {
         any_visible = true;
@@ -1215,6 +1234,19 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     let mut faithful = app.settings.faithful_visuals;
                     if widgets::switch(ui, &palette, &faithful_visuals, &mut faithful).changed() {
                         app.actions.push(Action::SetFaithfulVisuals(faithful));
+                    }
+                },
+            );
+            filtered_row(
+                ui,
+                &palette,
+                &needle,
+                &appearance,
+                &appearance_rows[11],
+                |ui| {
+                    let mut hearts = app.settings.faithful_heart_icons;
+                    if widgets::switch(ui, &palette, &faithful_hearts, &mut hearts).changed() {
+                        app.actions.push(Action::SetFaithfulHeartIcons(hearts));
                     }
                 },
             );

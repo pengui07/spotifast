@@ -130,6 +130,13 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         });
         if now_playing_visible {
             now_playing::side_panel(app, ui);
+        } else if app.settings.faithful_visuals
+            && app.settings.now_playing_panel_hidden
+            && !app.show_queue_panel
+            && !app.show_lyrics_panel
+            && !app.show_friends_panel
+        {
+            now_playing::restore_tab(app, ui);
         }
         central(app, ui);
         keep_room_for_panels(app, ctx);
@@ -228,6 +235,22 @@ fn keep_room_for_panels(app: &App, ctx: &Context) {
             width,
             crate::window::MAIN_MIN_SIZE[1],
         )));
+    }
+}
+
+/// Shared geometry keeps switching right-panel content from changing its size.
+pub(crate) const RIGHT_PANEL_ID: &str = "shared-right-panel";
+pub(crate) const RIGHT_PANEL_MAX_WIDTH: f32 = 640.0;
+
+/// Save intentional resizes after drawing, keeping temporary window constraints out.
+pub(crate) fn remember_right_panel_width(app: &mut App, ctx: &Context, width: f32, fit: &PanelFit) {
+    if app
+        .settings
+        .right_panel_width
+        .is_none_or(|chosen| (chosen - width).abs() > 1.0)
+        && panel_width_chosen(ctx, RIGHT_PANEL_ID, fit)
+    {
+        app.actions.push(Action::SetRightPanelWidth(width));
     }
 }
 
@@ -890,6 +913,100 @@ mod window_chrome_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn moved_buttons_keep_their_positions_and_actions() {
+        for width in [760.0, 1240.0] {
+            for dark in [true, false] {
+                let root = std::env::temp_dir()
+                    .join(format!("spotifast-button-moves-{}", std::process::id()));
+                let mut app = App::new(
+                    &crate::backend::Waker::default(),
+                    crate::paths::AppDirs {
+                        config: root.join("config"),
+                        state: root.join("state"),
+                        cache: root.join("cache"),
+                    },
+                    crate::settings::Settings::default(),
+                    crate::app::AppOptions {
+                        media_controls: false,
+                        restore_sign_in: false,
+                        tray: false,
+                    },
+                );
+                crate::demo::populate(&mut app);
+                let ctx = egui::Context::default();
+                ctx.enable_accesskit();
+                theme::install(&ctx);
+                ctx.set_visuals(if dark {
+                    egui::Visuals::dark()
+                } else {
+                    egui::Visuals::light()
+                });
+                let frame = |app: &mut App, events| {
+                    let mut output = ctx.run_ui(
+                        egui::RawInput {
+                            screen_rect: Some(Rect::from_min_size(
+                                egui::Pos2::ZERO,
+                                vec2(width, 800.0),
+                            )),
+                            events,
+                            ..Default::default()
+                        },
+                        |ui| {
+                            player_bar::show(app, ui);
+                            topbar::show(app, ui);
+                        },
+                    );
+                    output.textures_delta.clear();
+                    output.platform_output.accesskit_update.unwrap()
+                };
+                frame(&mut app, vec![]);
+                let tree = frame(&mut app, vec![]);
+                let button = |label: &str| {
+                    tree.nodes
+                        .iter()
+                        .find(|(_, node)| node.label() == Some(label))
+                        .unwrap_or_else(|| panic!("missing {label} at width {width}"))
+                };
+                let (friends_id, friends) = button("Listening activity");
+                let (cover_id, cover) = button("Now playing view");
+                let settings = button("Settings").1.bounds().unwrap();
+                let mini = button(if cfg!(target_os = "macos") {
+                    "Winamp mini player (Cmd+M)"
+                } else {
+                    "Winamp mini player (Ctrl+M)"
+                })
+                .1
+                .bounds()
+                .unwrap();
+                let volume = button("Volume (%)").1.bounds().unwrap();
+                let friends = friends.bounds().unwrap();
+                let cover = cover.bounds().unwrap();
+                assert!(mini.x1 < friends.x0 && friends.x1 < settings.x0);
+                assert!(volume.x1 < cover.x0);
+                assert!(friends.y1 < cover.y0);
+                for (id, expected) in [
+                    (*friends_id, "ToggleFriendsPanel"),
+                    (*cover_id, "ToggleCoverView"),
+                ] {
+                    app.actions.clear();
+                    frame(
+                        &mut app,
+                        vec![egui::Event::AccessKitActionRequest(
+                            egui::accesskit::ActionRequest {
+                                action: egui::accesskit::Action::Click,
+                                target_tree: egui::accesskit::TreeId::ROOT,
+                                target_node: id,
+                                data: None,
+                            },
+                        )],
+                    );
+                    assert!(format!("{:?}", app.actions).contains(expected));
+                }
+            }
+        }
+    }
 
     /// The header casts a shadow only on a page scrolled under it, and it
     /// is black in both themes, never the page's own colour.

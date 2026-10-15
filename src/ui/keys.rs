@@ -174,7 +174,7 @@ pub fn handle(app: &mut App, ctx: &egui::Context) {
         if app.dialog.is_some() {
             app.actions.push(Action::CloseDialog);
         } else if app.show_devices {
-            app.show_devices = false;
+            app.actions.push(Action::DismissDevicesPopup);
         } else if app.lyrics_fullscreen.is_some() {
             app.actions.push(Action::SetLyricsFullscreen(false));
         } else if app.cover_view {

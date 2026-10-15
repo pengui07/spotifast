@@ -140,8 +140,7 @@ pub fn show_sliding(app: &mut App, ui: &mut egui::Ui, shown: f32) {
                     .max_rect(right_band)
                     .layout(Layout::right_to_left(Align::Center)),
             );
-            let transport_right = center.center().x + transport_width() / 2.0;
-            extras(app, &mut right_ui, now.as_ref(), transport_right);
+            extras(app, &mut right_ui, now.as_ref());
         });
 }
 
@@ -579,21 +578,13 @@ fn now_playing_block(app: &mut App, ui: &mut egui::Ui, region: Rect, now: Option
         let saved = app.is_saved(&now.uri).unwrap_or(false);
         let (icon, color, tooltip) = if saved {
             (
-                if app.settings.faithful_visuals {
-                    Icon::CircleCheck
-                } else {
-                    Icon::HeartFilled
-                },
+                super::widgets::saved_track_icon(app, true),
                 palette.accent,
                 gettext(app.locale, "Remove from Liked Songs"),
             )
         } else {
             (
-                if app.settings.faithful_visuals {
-                    Icon::CirclePlus
-                } else {
-                    Icon::Heart
-                },
+                super::widgets::saved_track_icon(app, false),
                 palette.secondary,
                 gettext(app.locale, "Save to Liked Songs"),
             )
@@ -698,6 +689,13 @@ fn transport(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, region:
             gettext(app.locale, "Shuffle"),
         )
     });
+    if shuffle {
+        ui.painter().circle_filled(
+            pos2(shuffle_button.rect.center().x, cy + 14.0),
+            1.8,
+            palette.accent,
+        );
+    }
     if shuffle_button.clicked() {
         app.actions.push(Action::ToggleShuffle);
     }
@@ -781,7 +779,7 @@ fn transport(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, region:
         ),
     };
     let mut cell = centered(ui, slot(widths[4]));
-    if theme::icon_button(
+    let repeat_button = theme::icon_button(
         &mut cell,
         repeat_icon,
         17.0,
@@ -792,9 +790,15 @@ fn transport(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, region:
             palette.accent_hover
         },
         &tooltip,
-    )
-    .clicked()
-    {
+    );
+    if repeat != RepeatMode::Off {
+        ui.painter().circle_filled(
+            pos2(repeat_button.rect.center().x, cy + 14.0),
+            1.8,
+            palette.accent,
+        );
+    }
+    if repeat_button.clicked() {
         app.actions.push(Action::CycleRepeat);
     }
 
@@ -872,9 +876,49 @@ fn lyrics_shown(app: &App) -> bool {
     }
 }
 
-fn extras(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, transport_right: f32) {
+fn extras(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>) {
     let palette = app.palette;
     ui.spacing_mut().item_spacing.x = 6.0;
+    // The Now playing view sits to the right of volume; in full screen
+    // it leaves, lyrics or cover.
+    let (icon, lit, tooltip, action) = if app.lyrics_fullscreen.is_some() {
+        (
+            Icon::Minimize,
+            true,
+            gettext(app.locale, "Leave full screen (Esc)"),
+            Action::SetLyricsFullscreen(false),
+        )
+    } else if app.cover_view {
+        (
+            Icon::Minimize2,
+            true,
+            gettext(app.locale, "Close Now playing view (Esc)"),
+            Action::ToggleCoverView,
+        )
+    } else {
+        (
+            Icon::Maximize2,
+            false,
+            gettext(app.locale, "Now playing view"),
+            Action::ToggleCoverView,
+        )
+    };
+    if theme::icon_button(
+        ui,
+        icon,
+        18.0,
+        if lit {
+            palette.accent
+        } else {
+            palette.secondary
+        },
+        palette.text,
+        &tooltip,
+    )
+    .clicked()
+    {
+        app.actions.push(action);
+    }
     let volume = now
         .map(|now| now.volume_percent)
         .unwrap_or_else(|| crate::app::volume_to_percent(app.local.volume));
@@ -1015,66 +1059,6 @@ fn extras(app: &mut App, ui: &mut egui::Ui, now: Option<&NowPlaying>, transport_
     .clicked()
     {
         app.actions.push(Action::ToggleLyricsPanel);
-    }
-    // The Now playing view, when the bar has room for it beside the
-    // others; in full screen it leaves, lyrics or cover.
-    let (icon, lit, tooltip, action) = if app.lyrics_fullscreen.is_some() {
-        (
-            Icon::Minimize,
-            true,
-            gettext(app.locale, "Leave full screen (Esc)"),
-            Action::SetLyricsFullscreen(false),
-        )
-    } else if app.cover_view {
-        (
-            Icon::Minimize2,
-            true,
-            gettext(app.locale, "Close Now playing view (Esc)"),
-            Action::ToggleCoverView,
-        )
-    } else {
-        (
-            Icon::Maximize2,
-            false,
-            gettext(app.locale, "Now playing view"),
-            Action::ToggleCoverView,
-        )
-    };
-    if ui.available_width() >= 30.0
-        && theme::icon_button(
-            ui,
-            icon,
-            18.0,
-            if lit {
-                palette.accent
-            } else {
-                palette.secondary
-            },
-            palette.text,
-            &tooltip,
-        )
-        .clicked()
-    {
-        app.actions.push(action);
-    }
-    // Listening activity gives way before crowding the playback controls.
-    let left = ui.min_rect().left() - ui.spacing().item_spacing.x - (18.0 + 12.0);
-    if left - transport_right >= TRANSPORT_GAP
-        && theme::icon_button(
-            ui,
-            Icon::Users,
-            18.0,
-            if app.show_friends_panel {
-                palette.accent
-            } else {
-                palette.secondary
-            },
-            palette.text,
-            &gettext(app.locale, "Listening activity"),
-        )
-        .clicked()
-    {
-        app.actions.push(Action::ToggleFriendsPanel);
     }
 }
 

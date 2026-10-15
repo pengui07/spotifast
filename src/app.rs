@@ -1383,7 +1383,10 @@ impl App {
     }
 
     pub fn now_playing_panel_visible(&self) -> bool {
-        self.settings.faithful_visuals && !self.show_queue_panel && !self.show_lyrics_panel
+        self.settings.faithful_visuals
+            && !self.settings.now_playing_panel_hidden
+            && !self.show_queue_panel
+            && !self.show_lyrics_panel
     }
 
     pub fn now_playing(&self) -> Option<NowPlaying> {
@@ -9244,6 +9247,19 @@ impl App {
                 self.history = vec![Page::Home];
                 self.history_index = 0;
             }
+            Action::ToggleNowPlayingPanel => {
+                self.settings.now_playing_panel_hidden = !self.settings.now_playing_panel_hidden;
+                self.settings_dirty = true;
+            }
+            Action::SetRightPanelWidth(width) => {
+                if width.is_finite() && width > 0.0 {
+                    self.settings.right_panel_width = Some(width);
+                    // Retain the old fields for compatibility with older builds.
+                    self.settings.lyrics_width = width;
+                    self.settings.queue_width = width;
+                    self.settings_dirty = true;
+                }
+            }
             Action::ToggleSidebar => {
                 self.settings.sidebar_visible = !self.settings.sidebar_visible;
                 self.settings_dirty = true;
@@ -9334,6 +9350,7 @@ impl App {
             }
             Action::PauseLyricsFollow => self.lyrics_following = false,
             Action::RetryLyrics => self.request_lyrics(),
+            Action::DismissDevicesPopup => self.show_devices = false,
             Action::ToggleDevicesPopup => {
                 self.show_devices = !self.show_devices;
                 if self.show_devices {
@@ -9507,6 +9524,10 @@ impl App {
             Action::SettingsChanged => {
                 self.settings_dirty = true;
                 ctx.set_theme(self.theme_preference());
+            }
+            Action::SetFaithfulHeartIcons(enabled) => {
+                self.settings.faithful_heart_icons = enabled;
+                self.settings_dirty = true;
             }
             Action::RestartEngine => {
                 self.save_settings();
@@ -11077,7 +11098,7 @@ mod tests {
         }
         let least = crate::ui::topbar::least_width(&ctx);
         let sidebar = panel(&ctx, "sidebar");
-        let queue = panel(&ctx, "queue-panel");
+        let queue = panel(&ctx, crate::ui::RIGHT_PANEL_ID);
         assert!(
             sidebar + queue + least <= 1000.5,
             "the page keeps {} of the {least} points its bar needs",
@@ -11099,7 +11120,7 @@ mod tests {
             draw(&ctx, &mut app, 1800.0);
         }
         assert_eq!(panel(&ctx, "sidebar"), 400.0);
-        assert_eq!(panel(&ctx, "queue-panel"), 500.0);
+        assert_eq!(panel(&ctx, crate::ui::RIGHT_PANEL_ID), 500.0);
 
         // Closing the Queue gives the window its usual minimum back.
         app.show_queue_panel = false;
@@ -16036,10 +16057,13 @@ mod tests {
             );
             output.textures_delta.clear();
         }
-        let width = egui::containers::panel::PanelState::load(&ctx, egui::Id::new("friends-panel"))
-            .unwrap()
-            .size()
-            .x;
+        let width = egui::containers::panel::PanelState::load(
+            &ctx,
+            egui::Id::new(crate::ui::RIGHT_PANEL_ID),
+        )
+        .unwrap()
+        .size()
+        .x;
         assert!(
             width <= crate::theme::SIDE_PANEL_MIN_WIDTH + 1.0,
             "the panel grew to {width}"
@@ -17616,6 +17640,39 @@ mod tests {
         assert!(app.now_playing_panel_visible());
         app.settings.faithful_visuals = false;
         assert!(!app.now_playing_panel_visible());
+    }
+
+    #[test]
+    fn right_panel_preferences_survive_switching_views_and_restarting() {
+        let ctx = egui::Context::default();
+        let mut app = headless_app();
+        app.settings.faithful_visuals = true;
+        app.apply(Action::SetRightPanelWidth(510.0), &ctx);
+        app.apply(Action::ToggleNowPlayingPanel, &ctx);
+        for action in [
+            Action::ToggleQueuePanel,
+            Action::ToggleLyricsPanel,
+            Action::ToggleFriendsPanel,
+            Action::ToggleFriendsPanel,
+        ] {
+            app.apply(action, &ctx);
+            assert_eq!(app.settings.right_panel_width, Some(510.0));
+        }
+        assert!(
+            !app.now_playing_panel_visible(),
+            "closing other panels keeps the hidden preference"
+        );
+        let restored: Settings =
+            serde_json::from_str(&serde_json::to_string(&app.settings).unwrap()).unwrap();
+        assert!(restored.now_playing_panel_hidden);
+        assert_eq!(restored.right_panel_width, Some(510.0));
+        assert_eq!(restored.lyrics_width, 510.0);
+        assert_eq!(restored.queue_width, 510.0);
+        app.apply(Action::SetFaithfulHeartIcons(true), &ctx);
+        let restored: Settings =
+            serde_json::from_str(&serde_json::to_string(&app.settings).unwrap()).unwrap();
+        assert!(restored.faithful_heart_icons);
+        app.backend.shutdown();
     }
 
     /// #369: Go to song radio opens the radio's page, as in Spotify's app,

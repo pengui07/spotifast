@@ -19,18 +19,22 @@ const TITLE_INSET: i8 = 4;
 const CLOSE_GLYPH_INSET: i8 = 6;
 
 pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
+    let chosen = app
+        .settings
+        .right_panel_width
+        .unwrap_or(app.settings.queue_width);
     let palette = app.palette;
     let locale = app.locale;
     let fit = super::yielding_panel(
         ui.ctx(),
-        "friends-panel",
-        theme::SIDE_PANEL_MIN_WIDTH..=560.0,
-        app.settings.queue_width,
+        super::RIGHT_PANEL_ID,
+        theme::SIDE_PANEL_MIN_WIDTH..=super::RIGHT_PANEL_MAX_WIDTH,
+        chosen,
         ui.available_width() - super::page_min_width(app, ui.ctx()),
     );
-    let panel = egui::Panel::right("friends-panel")
+    let panel = egui::Panel::right(super::RIGHT_PANEL_ID)
         .resizable(true)
-        .default_size(app.settings.queue_width)
+        .default_size(chosen)
         .size_range(fit.range.clone())
         .show_separator_line(false)
         .frame(
@@ -80,15 +84,9 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
             .auto_shrink([false, false])
             .show(ui, |ui| contents(app, ui));
     });
-    // The Listening activity panel shares the Queue panel's width, so switching
-    // between the two never moves the page.
+    // All right-panel views share the same chosen width.
     let width = response.response.rect.width();
-    if (width - app.settings.queue_width).abs() > 1.0
-        && super::panel_width_chosen(ui.ctx(), "friends-panel", &fit)
-    {
-        app.settings.queue_width = width;
-        app.actions.push(Action::SettingsChanged);
-    }
+    super::remember_right_panel_width(app, ui.ctx(), width, &fit);
 }
 
 fn contents(app: &mut App, ui: &mut egui::Ui) {

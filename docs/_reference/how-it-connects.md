@@ -170,6 +170,12 @@ current-track pickup.
 
 ## Collection loading and artwork
 
+The combined Library loads saved albums and podcasts through the same
+paginated library requests used by their category views, alongside playlists.
+Scrolling near the end loads more of each visible category. Selecting a
+category limits these sidebar requests to that category; followed artists
+are not loaded for the sidebar.
+
 Since 0.9.0, opening a playlist, album, artist, or podcast keeps any
 title, summary, and cover Spotifast already knows while the complete page is
 requested. Controls that need unfinished details stay disabled, and a loading

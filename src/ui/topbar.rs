@@ -12,7 +12,7 @@ use crate::theme::{self, Icon, Palette};
 
 /// The gap the bar keeps between everything it lays out.
 const ITEM_SPACING: f32 = 8.0;
-/// The account avatar, and the icon in each of the three buttons beside it.
+/// The account avatar, and the icon in each of the four buttons beside it.
 const AVATAR_SIZE: f32 = 36.0;
 const ICON_BUTTON_ICON: f32 = 19.0;
 /// `theme::icon_button` pads its icon by 12 px.
@@ -34,12 +34,12 @@ const SEARCH_FLOOR: f32 = 130.0;
 // Keep the original 80-point minimum inside the page's own toolbar.
 const SEARCH_MIN: f32 = 80.0;
 /// Everything at the right end whose width never changes: the page padding,
-/// the avatar, the gap the account menu leaves, the three icon buttons, and
+/// the avatar, the gap the account menu leaves, the four icon buttons, and
 /// the spacing between them. The cursor stops at the left edge of the last
-/// button, so this counts three gaps, not four. The spinner and the badges
+/// button, so this counts four gaps, not five. The spinner and the badges
 /// are measured on top of it because they come and go.
 const RIGHT_CONTROLS_WIDTH: f32 =
-    super::widgets::PAGE_PADDING + AVATAR_SIZE + 4.0 + 3.0 * ICON_BUTTON_SIZE + 3.0 * ITEM_SPACING;
+    super::widgets::PAGE_PADDING + AVATAR_SIZE + 4.0 + 4.0 * ICON_BUTTON_SIZE + 4.0 * ITEM_SPACING;
 
 /// What precedes the field until the bar has drawn once: the page padding,
 /// the back and forward buttons and the gaps after them.
@@ -52,7 +52,7 @@ fn lead_id() -> egui::Id {
 }
 
 /// The narrowest the bar, and so the page under it, can be before its
-/// controls run into each other: the narrowest field, with the spinner and
+/// controls run into each other: a readable field, with the spinner and
 /// both badges as icons. Counting them even while they are away keeps the
 /// panels and the window from changing width as they come and go.
 pub fn least_width(ctx: &egui::Context) -> f32 {
@@ -63,7 +63,7 @@ pub fn least_width(ctx: &egui::Context) -> f32 {
 }
 
 fn least_width_after(lead: f32) -> f32 {
-    lead + SEARCH_MIN
+    lead + SEARCH_FLOOR
         + RIGHT_CONTROLS_WIDTH
         + SPINNER_SIZE
         + ITEM_SPACING
@@ -193,6 +193,9 @@ fn nav_button(
 }
 
 pub fn show(app: &mut App, ui: &mut egui::Ui) {
+    ui.ctx().data_mut(|data| {
+        data.remove::<egui::Rect>(egui::Id::new(super::devices::BADGE_RECT_ID));
+    });
     let palette = app.palette;
     let locale = app.locale;
     let width = ui.available_width();
@@ -337,7 +340,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             let compact = app.settings.faithful_visuals
                 && search_room < controls + badges(false) + home_width + search_gap + SEARCH_MIN;
             if compact {
-                controls -= 3.0 * (ICON_BUTTON_SIZE + ITEM_SPACING);
+                controls -= 4.0 * (ICON_BUTTON_SIZE + ITEM_SPACING);
             }
             let fit = topbar_fit(
                 search_room,
@@ -497,10 +500,15 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                             Some(Icon::Settings),
                             &gettext(locale, "Settings"),
                         ) {
-                            app.actions.push(Action::Open(Page::Settings));
+                            app.actions.push(super::settings::toggle_action(app));
                         }
                         if compact {
                             for (icon, label, action) in [
+                                (
+                                    Icon::Users,
+                                    gettext(locale, "Listening activity").into_owned(),
+                                    Action::ToggleFriendsPanel,
+                                ),
                                 (
                                     Icon::AudioLines,
                                     super::keys::platform_shortcut(
@@ -556,7 +564,23 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     )
                     .clicked()
                     {
-                        app.actions.push(Action::Open(Page::Settings));
+                        app.actions.push(super::settings::toggle_action(app));
+                    }
+                    if theme::icon_button(
+                        ui,
+                        Icon::Users,
+                        ICON_BUTTON_ICON,
+                        if app.show_friends_panel {
+                            palette.accent
+                        } else {
+                            palette.secondary
+                        },
+                        palette.text,
+                        &gettext(locale, "Listening activity"),
+                    )
+                    .clicked()
+                    {
+                        app.actions.push(Action::ToggleFriendsPanel);
                     }
                     if app.settings.milkdrop_enabled
                         && theme::icon_button(
@@ -612,6 +636,12 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                         DEVICE_BADGE_PADDING,
                         fit.labels,
                     );
+                    ui.ctx().data_mut(|data| {
+                        data.insert_temp(
+                            egui::Id::new(super::devices::BADGE_RECT_ID),
+                            response.rect,
+                        )
+                    });
                     // Without its label the badge still has to say where
                     // playback went.
                     let response = if fit.labels {
@@ -667,9 +697,10 @@ mod topbar_fit_tests {
     // Collapsed, a badge is a square chip as tall as its text.
     const CHIP: f32 = ITEM_SPACING + 15.0 + BADGE_PADDING_Y;
 
-    /// The narrowest bar the app can produce: a 760 px window, its sidebar,
-    /// and the navigation buttons all taken out.
-    const NARROWEST_BAR: f32 = 398.0;
+    /// The minimum room reserved after navigation, including the additional
+    /// Listening activity button, spinner, and both collapsed badges.
+    const NARROWEST_BAR: f32 =
+        SEARCH_FLOOR + RIGHT_CONTROLS_WIDTH + SPINNER_SIZE + ITEM_SPACING + CHIP * 2.0;
 
     fn right_end(room: f32, labelled: f32, icons: f32) -> f32 {
         let fit = topbar_fit(room, RIGHT_CONTROLS_WIDTH, labelled, icons);
@@ -725,7 +756,7 @@ mod topbar_fit_tests {
     }
 
     /// At the least width the panels leave it, the bar still holds the
-    /// spinner and both badges beside the narrowest field (#624).
+    /// spinner and both badges beside a readable field (#624).
     #[test]
     fn the_least_width_holds_every_control_beside_the_field() {
         let lead = LEAD_GUESS;
@@ -733,7 +764,7 @@ mod topbar_fit_tests {
         let controls = RIGHT_CONTROLS_WIDTH + SPINNER_SIZE + ITEM_SPACING;
         let fit = topbar_fit(room, controls, DEVICE + UPDATE, CHIP * 2.0);
         assert!(!fit.labels);
-        assert_eq!(fit.search, SEARCH_MIN);
+        assert_eq!(fit.search, SEARCH_FLOOR);
         assert!(controls + CHIP * 2.0 + fit.search <= room);
     }
 

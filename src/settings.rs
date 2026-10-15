@@ -297,6 +297,8 @@ pub struct Settings {
     pub milkdrop_enabled: bool,
     /// Spotify-style shell, neutral surfaces, and controls.
     pub faithful_visuals: bool,
+    /// Use hearts instead of plus/check icons for songs in Faithful UI.
+    pub faithful_heart_icons: bool,
     /// Windows title bar choice before enabling Faithful UI.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub faithful_visuals_previous_titlebar: Option<bool>,
@@ -313,6 +315,10 @@ pub struct Settings {
     pub sidebar_width: f32,
     pub lyrics_width: f32,
     pub queue_width: f32,
+    /// Shared right-panel width. Older settings keep their first visible panel's width.
+    pub right_panel_width: Option<f32>,
+    /// Keep the Now playing side panel collapsed to its restore tab.
+    pub now_playing_panel_hidden: bool,
     /// Use compact single-line rows without cover art in track lists.
     pub tracklist_compact: bool,
     /// Linux: middle-click a list to autoscroll it. Off by default, because
@@ -476,6 +482,7 @@ impl Default for Settings {
             winamp_enabled: true,
             milkdrop_enabled: true,
             faithful_visuals: false,
+            faithful_heart_icons: false,
             faithful_visuals_previous_titlebar: None,
             volume: (u16::MAX as u32 * 70 / 100) as u16,
             sidebar_visible: true,
@@ -485,6 +492,8 @@ impl Default for Settings {
             sidebar_width: 250.0,
             lyrics_width: 360.0,
             queue_width: 360.0,
+            right_panel_width: None,
+            now_playing_panel_hidden: false,
             tracklist_compact: false,
             middle_click_autoscroll: false,
             search_history: Vec::new(),

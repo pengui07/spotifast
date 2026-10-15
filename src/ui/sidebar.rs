@@ -12,6 +12,13 @@ use crate::theme::{self, Icon, Palette};
 const DEFAULT_ROW_HEIGHT: f32 = 60.0;
 const COMPACT_ROW_HEIGHT: f32 = 32.0;
 
+/// No category selected means the combined Library. Artists are not a category.
+fn visible_shelves(filter: Option<Filter>) -> impl Iterator<Item = Filter> {
+    [Filter::Playlists, Filter::Albums, Filter::Podcasts]
+        .into_iter()
+        .filter(move |shelf| filter.is_none_or(|selected| selected == *shelf))
+}
+
 struct Entry {
     image: Option<String>,
     grid_image: Option<String>,
@@ -839,7 +846,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
 
     let filter_id = egui::Id::new("sidebar-filter");
     let mut filter = ui
-        .data(|data| data.get_temp::<Filter>(filter_id))
+        .data(|data| data.get_temp::<Option<Filter>>(filter_id))
         .unwrap_or_default();
     let show_search_id = egui::Id::new("sidebar-show-search");
     let mut show_search = ui
@@ -940,15 +947,18 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
         for (value, label) in [
             (Filter::Playlists, gettext(locale, "Playlists")),
             (Filter::Albums, gettext(locale, "Albums")),
-            (Filter::Artists, gettext(locale, "Artists")),
             (Filter::Podcasts, gettext(locale, "Podcasts")),
         ] {
-            if theme::soft_button(ui, &palette, None, &label, filter == value).clicked() {
-                filter = value;
+            if theme::soft_button(ui, &palette, None, &label, filter == Some(value)).clicked() {
+                filter = if filter == Some(value) {
+                    None
+                } else {
+                    Some(value)
+                };
             }
         }
     });
-    let sort = selected_sort(app, filter);
+    let sort = selected_sort(app, filter.unwrap_or(Filter::Playlists));
     ui.data_mut(|data| {
         data.insert_temp(filter_id, filter);
         data.insert_temp(show_search_id, show_search);
@@ -970,34 +980,29 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
     }
     ui.add_space(6.0);
 
-    // Make sure the selected shelf is loading.
-    match filter {
-        Filter::Playlists => {}
-        Filter::Albums => {
-            if !app.library.albums.loading
-                && app.library.albums.error.is_none()
-                && (!app.library.albums.loaded_once
-                    || (sort != LibrarySort::Library && app.library.albums.can_load_more()))
-            {
-                app.actions.push(Action::LoadMore(Page::Albums));
+    // Load every visible category through its existing paginated requests.
+    for shelf in visible_shelves(filter) {
+        let sort = selected_sort(app, shelf);
+        match shelf {
+            Filter::Playlists => {}
+            Filter::Albums => {
+                if !app.library.albums.loading
+                    && app.library.albums.error.is_none()
+                    && (!app.library.albums.loaded_once
+                        || (sort != LibrarySort::Library && app.library.albums.can_load_more()))
+                {
+                    app.actions.push(Action::LoadMore(Page::Albums));
+                }
             }
-        }
-        Filter::Artists => {
-            if !app.library.artists.loading
-                && app.library.artists.error.is_none()
-                && (!app.library.artists.loaded_once
-                    || (sort != LibrarySort::Library && app.library.artists.can_load_more()))
-            {
-                app.actions.push(Action::LoadMore(Page::Artists));
-            }
-        }
-        Filter::Podcasts => {
-            if !app.library.shows.loading
-                && app.library.shows.error.is_none()
-                && (!app.library.shows.loaded_once
-                    || (sort != LibrarySort::Library && app.library.shows.can_load_more()))
-            {
-                app.actions.push(Action::LoadMore(Page::Podcasts));
+            Filter::Artists => {}
+            Filter::Podcasts => {
+                if !app.library.shows.loading
+                    && app.library.shows.error.is_none()
+                    && (!app.library.shows.loaded_once
+                        || (sort != LibrarySort::Library && app.library.shows.can_load_more()))
+                {
+                    app.actions.push(Action::LoadMore(Page::Podcasts));
+                }
             }
         }
     }
@@ -1007,150 +1012,134 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
     let mut entries: Vec<Entry> = Vec::new();
     let mut loading = false;
     let mut error: Option<String> = None;
-    let mut more_page: Option<Page> = None;
-    match filter {
-        Filter::Playlists => {
-            let liked = liked_entry(app);
-            if needle.is_empty() || liked.name.to_lowercase().contains(&needle) {
-                entries.push(liked);
-            }
-            let show_folders = sort == LibrarySort::Spotify && needle.is_empty();
-            if show_folders {
-                folder_rows(app, &user_id, &mut entries);
-            }
-            match &app.library.playlists {
-                Loadable::Loaded(_) if show_folders => {}
-                Loadable::Loaded(playlists) => {
-                    for (index, playlist) in playlists.iter().enumerate() {
-                        if !needle.is_empty() && !playlist.name.to_lowercase().contains(&needle) {
-                            continue;
+    let mut more_pages = Vec::new();
+    for shelf in visible_shelves(filter) {
+        let start = entries.len();
+        let sort = selected_sort(app, shelf);
+        match shelf {
+            Filter::Playlists => {
+                let liked = liked_entry(app);
+                if needle.is_empty() || liked.name.to_lowercase().contains(&needle) {
+                    entries.push(liked);
+                }
+                let show_folders = sort == LibrarySort::Spotify && needle.is_empty();
+                if show_folders {
+                    folder_rows(app, &user_id, &mut entries);
+                }
+                match &app.library.playlists {
+                    Loadable::Loaded(_) if show_folders => {}
+                    Loadable::Loaded(playlists) => {
+                        for (index, playlist) in playlists.iter().enumerate() {
+                            if !needle.is_empty() && !playlist.name.to_lowercase().contains(&needle)
+                            {
+                                continue;
+                            }
+                            entries.push(playlist_entry(
+                                locale,
+                                playlist,
+                                index,
+                                &user_id,
+                                app.can_edit_playlist(playlist),
+                                0,
+                            ));
                         }
-                        entries.push(playlist_entry(
-                            locale,
-                            playlist,
-                            index,
-                            &user_id,
-                            app.can_edit_playlist(playlist),
-                            0,
-                        ));
+                    }
+                    Loadable::Loading | Loadable::NotLoaded => loading = true,
+                    Loadable::Failed(message) => {
+                        error.get_or_insert_with(|| message.clone());
                     }
                 }
-                Loadable::Loading | Loadable::NotLoaded => loading = true,
-                Loadable::Failed(message) => error = Some(message.clone()),
+            }
+            Filter::Albums => {
+                for saved in &app.library.albums.items {
+                    let album = &saved.album;
+                    if !needle.is_empty()
+                        && !album.name.to_lowercase().contains(&needle)
+                        && !album
+                            .artists
+                            .iter()
+                            .any(|a| a.name.to_lowercase().contains(&needle))
+                    {
+                        continue;
+                    }
+                    let artists = crate::api::models::join_names(
+                        album.artists.iter().map(|artist| artist.name.as_str()),
+                    );
+                    entries.push(Entry {
+                        image: pick_image(&album.images, super::row_art()).map(str::to_string),
+                        grid_image: pick_image(&album.images, super::GRID_ART_TARGET_WIDTH)
+                            .map(str::to_string),
+                        name: album.name.clone(),
+                        subtitle: format!("{} • {artists}", app.album_kind_label(album)),
+                        grid_subtitle: artists,
+                        page: Page::Album(album.id.clone()),
+                        uri: album.uri.clone(),
+                        round: false,
+                        liked: false,
+                        owned: false,
+                        editable: false,
+                        playlist_index: None,
+                        folder: None,
+                        depth: 0,
+                        added_at: saved_time(saved.added_at.as_deref()),
+                    });
+                }
+                loading |= app.library.albums.loading && app.library.albums.items.is_empty();
+                error = error.or_else(|| app.library.albums.error.clone());
+                if app.library.albums.error.is_none() && app.library.albums.can_load_more() {
+                    more_pages.push(Page::Albums);
+                }
+            }
+            Filter::Artists => {}
+            Filter::Podcasts => {
+                for saved in &app.library.shows.items {
+                    let show = &saved.show;
+                    // Audiobooks arrive as shows, but librespot can't play them.
+                    if app.audiobook_shows.contains(&show.uri) {
+                        continue;
+                    }
+                    if !needle.is_empty() && !show.name.to_lowercase().contains(&needle) {
+                        continue;
+                    }
+                    entries.push(Entry {
+                        image: pick_image(&show.images, super::row_art()).map(str::to_string),
+                        grid_image: pick_image(&show.images, super::GRID_ART_TARGET_WIDTH)
+                            .map(str::to_string),
+                        name: show.name.clone(),
+                        // Translators: {publisher} is the podcast's publisher.
+                        subtitle: gettext(locale, "Podcast • {publisher}")
+                            .replace("{publisher}", &show.publisher),
+                        grid_subtitle: show.publisher.clone(),
+                        page: Page::Show(show.id.clone()),
+                        uri: show.uri.clone(),
+                        round: false,
+                        liked: false,
+                        owned: false,
+                        editable: false,
+                        playlist_index: None,
+                        folder: None,
+                        depth: 0,
+                        added_at: saved_time(saved.added_at.as_deref()),
+                    });
+                }
+                loading |= app.library.shows.loading && app.library.shows.items.is_empty();
+                error = error.or_else(|| app.library.shows.error.clone());
+                if app.library.shows.error.is_none() && app.library.shows.can_load_more() {
+                    more_pages.push(Page::Podcasts);
+                }
             }
         }
-        Filter::Albums => {
-            for saved in &app.library.albums.items {
-                let album = &saved.album;
-                if !needle.is_empty()
-                    && !album.name.to_lowercase().contains(&needle)
-                    && !album
-                        .artists
-                        .iter()
-                        .any(|a| a.name.to_lowercase().contains(&needle))
-                {
-                    continue;
-                }
-                let artists = crate::api::models::join_names(
-                    album.artists.iter().map(|artist| artist.name.as_str()),
-                );
-                entries.push(Entry {
-                    image: pick_image(&album.images, super::row_art()).map(str::to_string),
-                    grid_image: pick_image(&album.images, super::GRID_ART_TARGET_WIDTH)
-                        .map(str::to_string),
-                    name: album.name.clone(),
-                    subtitle: format!("{} • {artists}", app.album_kind_label(album)),
-                    grid_subtitle: artists,
-                    page: Page::Album(album.id.clone()),
-                    uri: album.uri.clone(),
-                    round: false,
-                    liked: false,
-                    owned: false,
-                    editable: false,
-                    playlist_index: None,
-                    folder: None,
-                    depth: 0,
-                    added_at: saved_time(saved.added_at.as_deref()),
-                });
-            }
-            loading = app.library.albums.loading && app.library.albums.items.is_empty();
-            error = app.library.albums.error.clone();
-            if app.library.albums.error.is_none() && app.library.albums.can_load_more() {
-                more_page = Some(Page::Albums);
-            }
-        }
-        Filter::Artists => {
-            for artist in &app.library.artists.items {
-                if !needle.is_empty() && !artist.name.to_lowercase().contains(&needle) {
-                    continue;
-                }
-                entries.push(Entry {
-                    image: pick_image(&artist.images, super::row_art()).map(str::to_string),
-                    grid_image: pick_image(&artist.images, super::GRID_ART_TARGET_WIDTH)
-                        .map(str::to_string),
-                    name: artist.name.clone(),
-                    subtitle: gettext(locale, "Artist").into_owned(),
-                    grid_subtitle: String::new(),
-                    page: Page::Artist(artist.id.clone()),
-                    uri: artist.uri.clone(),
-                    round: true,
-                    liked: false,
-                    owned: false,
-                    editable: false,
-                    playlist_index: None,
-                    folder: None,
-                    depth: 0,
-                    added_at: None,
-                });
-            }
-            loading = app.library.artists.loading && app.library.artists.items.is_empty();
-            error = app.library.artists.error.clone();
-            if app.library.artists.error.is_none() && app.library.artists.can_load_more() {
-                more_page = Some(Page::Artists);
-            }
-        }
-        Filter::Podcasts => {
-            for saved in &app.library.shows.items {
-                let show = &saved.show;
-                // Audiobooks arrive as shows, but librespot can't play them.
-                if app.audiobook_shows.contains(&show.uri) {
-                    continue;
-                }
-                if !needle.is_empty() && !show.name.to_lowercase().contains(&needle) {
-                    continue;
-                }
-                entries.push(Entry {
-                    image: pick_image(&show.images, super::row_art()).map(str::to_string),
-                    grid_image: pick_image(&show.images, super::GRID_ART_TARGET_WIDTH)
-                        .map(str::to_string),
-                    name: show.name.clone(),
-                    // Translators: {publisher} is the podcast's publisher.
-                    subtitle: gettext(locale, "Podcast • {publisher}")
-                        .replace("{publisher}", &show.publisher),
-                    grid_subtitle: show.publisher.clone(),
-                    page: Page::Show(show.id.clone()),
-                    uri: show.uri.clone(),
-                    round: false,
-                    liked: false,
-                    owned: false,
-                    editable: false,
-                    playlist_index: None,
-                    folder: None,
-                    depth: 0,
-                    added_at: saved_time(saved.added_at.as_deref()),
-                });
-            }
-            loading = app.library.shows.loading && app.library.shows.items.is_empty();
-            error = app.library.shows.error.clone();
-            if app.library.shows.error.is_none() && app.library.shows.can_load_more() {
-                more_page = Some(Page::Podcasts);
-            }
-        }
-    }
 
-    order_entries(app, filter, sort, &mut entries);
-    let custom_order = filter == Filter::Playlists && sort == LibrarySort::Local;
+        order_entries(app, shelf, sort, &mut entries[start..]);
+    }
     let pins = app.settings.library_pins();
+    entries.sort_by_key(|entry| {
+        pins.iter()
+            .position(|key| key == entry.ordering_key())
+            .unwrap_or(usize::MAX)
+    });
+    let custom_order =
+        filter.is_none_or(|shelf| shelf == Filter::Playlists) && sort == LibrarySort::Local;
     let pinned_rows = entries
         .iter()
         .take_while(|entry| pins.iter().any(|key| key == entry.ordering_key()))
@@ -1199,7 +1188,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
                     pinned_rows,
                     grid_art,
                 );
-                if let Some(page) = more_page {
+                for page in more_pages {
                     super::widgets::load_more_when_near_end(ui, app, page, true);
                 }
                 ui.add_space(grid_art.map_or(0.0, |rect| ui.max_rect().bottom() - rect.top()));
@@ -1489,14 +1478,17 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
                 if ui.input(|input| input.pointer.button_released(egui::PointerButton::Primary))
                     && let Some(drag) = egui::DragAndDrop::take_payload::<DragEntry>(ui.ctx())
                 {
-                    if filter == Filter::Playlists {
+                    if filter.is_none_or(|shelf| shelf == Filter::Playlists)
+                        && (drag.uri == LIKED_SONGS_KEY
+                            || drag.uri.starts_with("spotify:playlist:"))
+                    {
                         drop_playlist_row(app, &entries, pinned_rows, slot, &drag.uri);
                     } else {
                         drop_row(app, &entries, pinned_rows, slot, &drag.uri);
                     }
                 }
             }
-            if let Some(page) = more_page {
+            for page in more_pages {
                 super::widgets::load_more_when_near_end(ui, app, page, true);
             }
         },
@@ -1570,7 +1562,7 @@ fn library_grid(
     app: &mut App,
     ui: &mut egui::Ui,
     entries: &[Entry],
-    filter: Filter,
+    filter: Option<Filter>,
     custom_order: bool,
     pinned_rows: usize,
     grid_art: Option<Rect>,
@@ -1775,7 +1767,9 @@ fn library_grid(
         && ui.input(|input| input.pointer.button_released(egui::PointerButton::Primary))
         && let Some(drag) = egui::DragAndDrop::take_payload::<DragEntry>(ui.ctx())
     {
-        if filter == Filter::Playlists {
+        if filter.is_none_or(|shelf| shelf == Filter::Playlists)
+            && (drag.uri == LIKED_SONGS_KEY || drag.uri.starts_with("spotify:playlist:"))
+        {
             drop_playlist_row(app, entries, pinned_rows, slot, &drag.uri);
         } else {
             drop_row(app, entries, pinned_rows, slot, &drag.uri);
@@ -1808,6 +1802,7 @@ fn entry_menu(app: &mut App, response: &egui::Response, entry: &Entry, custom_or
                 );
                 pin_menu(app, ui, entry.ordering_key());
                 if custom_order
+                    && entry.playlist_index.is_some()
                     && super::widgets::menu_item(
                         ui,
                         &app.palette,

@@ -9,6 +9,7 @@ use crate::model::Action;
 use crate::theme::{self, Icon};
 
 pub const BUTTON_RECT_ID: &str = "devices-button-rect";
+pub const BADGE_RECT_ID: &str = "devices-badge-rect";
 
 fn receiver_is_listed(receiver: &crate::zeroconf::Receiver, devices: &[Device]) -> bool {
     devices
@@ -174,6 +175,22 @@ pub fn popup(app: &mut App, ctx: &egui::Context) {
     let button = ctx
         .data(|data| data.get_temp::<Rect>(egui::Id::new(BUTTON_RECT_ID)))
         .unwrap_or_else(|| Rect::from_min_size(pos2(400.0, 400.0), vec2(0.0, 0.0)));
+    let badge = ctx.data(|data| data.get_temp::<Rect>(egui::Id::new(BADGE_RECT_ID)));
+    // While the foreground picker is open, handle its trigger clicks here as
+    // an explicit dismissal. Do not depend on the underlying button receiving
+    // a widget click, and never let a queued toggle reopen the picker.
+    let clicked_trigger = ctx.input(|input| {
+        input.pointer.primary_clicked()
+            && input.pointer.interact_pos().is_some_and(|pos| {
+                button.contains(pos) || badge.is_some_and(|rect| rect.contains(pos))
+            })
+    });
+    if clicked_trigger {
+        app.actions
+            .retain(|action| !matches!(action, Action::ToggleDevicesPopup));
+        app.actions.push(Action::DismissDevicesPopup);
+        return;
+    }
     let width = 320.0;
     let position = pos2(
         (button.right() - width).max(8.0),
@@ -361,13 +378,14 @@ pub fn popup(app: &mut App, ctx: &egui::Context) {
     let popup_rect = area.response.rect;
     let clicked_outside = ctx.input(|input| {
         input.pointer.any_pressed()
-            && input
-                .pointer
-                .interact_pos()
-                .is_some_and(|pos| !popup_rect.contains(pos) && !button.contains(pos))
+            && input.pointer.interact_pos().is_some_and(|pos| {
+                !popup_rect.contains(pos)
+                    && !button.contains(pos)
+                    && !badge.is_some_and(|rect| rect.contains(pos))
+            })
     });
     if clicked_outside {
-        app.show_devices = false;
+        app.actions.push(Action::DismissDevicesPopup);
     }
 }
 

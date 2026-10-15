@@ -35,17 +35,21 @@ pub fn page(app: &mut App, ui: &mut egui::Ui) {
 }
 
 pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
+    let chosen = app
+        .settings
+        .right_panel_width
+        .unwrap_or(app.settings.queue_width);
     let palette = app.palette;
     let fit = super::yielding_panel(
         ui.ctx(),
-        "queue-panel",
-        theme::SIDE_PANEL_MIN_WIDTH..=560.0,
-        app.settings.queue_width,
+        super::RIGHT_PANEL_ID,
+        theme::SIDE_PANEL_MIN_WIDTH..=super::RIGHT_PANEL_MAX_WIDTH,
+        chosen,
         ui.available_width() - super::page_min_width(app, ui.ctx()),
     );
-    let panel = egui::Panel::right("queue-panel")
+    let panel = egui::Panel::right(super::RIGHT_PANEL_ID)
         .resizable(true)
-        .default_size(app.settings.queue_width)
+        .default_size(chosen)
         .size_range(fit.range.clone())
         .show_separator_line(false)
         .frame(
@@ -136,17 +140,12 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
         app,
         ui,
         panel_style,
-        "queue-panel",
+        super::RIGHT_PANEL_ID,
         true,
         response.response.rect,
     );
     let width = response.response.rect.width();
-    if (width - app.settings.queue_width).abs() > 1.0
-        && super::panel_width_chosen(ui.ctx(), "queue-panel", &fit)
-    {
-        app.settings.queue_width = width;
-        app.actions.push(Action::SettingsChanged);
-    }
+    super::remember_right_panel_width(app, ui.ctx(), width, &fit);
 }
 
 /// Saves the current and upcoming queue as a playlist.

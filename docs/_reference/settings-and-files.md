@@ -220,6 +220,9 @@ main fields are:
 | Field | Default | Meaning |
 | --- | --- | --- |
 | `device_name` | `Spotifast` | Name on Spotify Connect |
+| `right_panel_width` | `null` | Shared width for Now playing, Lyrics, Queue, and Listening activity. Older settings use the first visible panel's existing width; `lyrics_width` and `queue_width` remain readable by older builds |
+| `now_playing_panel_hidden` | `false` | Collapse the Now playing side panel to a narrow restore tab |
+| `faithful_heart_icons` | `false` | Use hearts for saved songs while Faithful UI is enabled |
 | `bitrate` | `320` | 96, 160, or 320 kbps |
 | `normalisation` | `false` | Volume normalisation |
 | `autoplay` | `true` | Keep playing similar music at the end |

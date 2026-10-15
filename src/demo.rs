@@ -1585,6 +1585,105 @@ mod tests {
             .0
     }
 
+    #[test]
+    fn connect_triggers_close_the_picker_on_a_second_click() {
+        for trigger in [
+            crate::ui::devices::BUTTON_RECT_ID,
+            crate::ui::devices::BADGE_RECT_ID,
+        ] {
+            let (ctx, mut app) = accessible_app("connect-second-click");
+            app.settings.faithful_visuals = true;
+            app.backend.set_offline(true);
+            for _ in 0..3 {
+                frame(&ctx, &mut app);
+            }
+            let center = ctx
+                .data(|data| data.get_temp::<egui::Rect>(egui::Id::new(trigger)))
+                .expect("visible Connect trigger")
+                .center();
+            frame_events(
+                &ctx,
+                &mut app,
+                pointer_click(center, egui::PointerButton::Primary),
+            );
+            assert!(app.show_devices, "first click opens {trigger}");
+            for _ in 0..3 {
+                frame(&ctx, &mut app);
+            }
+            // Use separate press and release frames, as a physical mouse does.
+            for event in pointer_click(center, egui::PointerButton::Primary) {
+                frame_events(&ctx, &mut app, vec![event]);
+            }
+            assert!(!app.show_devices, "second click closes {trigger}");
+            frame(&ctx, &mut app);
+            assert!(!app.show_devices, "closing must not queue a reopen");
+            app.backend.shutdown();
+        }
+    }
+
+    #[test]
+    fn the_entire_collapsed_now_playing_tab_restores_the_panel() {
+        let (ctx, mut app) = accessible_app("restore-tab-clicks");
+        app.settings.faithful_visuals = true;
+        app.backend.set_offline(true);
+        for fraction in [0.15, 0.85] {
+            app.apply(Action::ToggleNowPlayingPanel, &ctx);
+            accessible_frame(&ctx, &mut app, vec![]);
+            let tree = accessible_frame(&ctx, &mut app, vec![]);
+            let id = accessible_node(&tree, "Now playing", egui::accesskit::Role::Button);
+            let rect = tree
+                .nodes
+                .iter()
+                .find(|(held, _)| *held == id)
+                .unwrap()
+                .1
+                .bounds()
+                .unwrap();
+            let point = egui::pos2(
+                ((rect.x0 + rect.x1) / 2.0) as f32,
+                (rect.y0 + (rect.y1 - rect.y0) * fraction) as f32,
+            );
+            frame_events(
+                &ctx,
+                &mut app,
+                pointer_click(point, egui::PointerButton::Primary),
+            );
+            assert!(!app.settings.now_playing_panel_hidden);
+            assert!(app.now_playing_panel_visible());
+        }
+        app.backend.shutdown();
+    }
+
+    #[test]
+    fn library_category_buttons_toggle_back_to_the_combined_view() {
+        let (ctx, mut app) = accessible_app("library-category-toggles");
+        app.backend.set_offline(true);
+        apply_flags(&mut app, Some("playlist:pl1"), None);
+        for (label, shelf) in [
+            ("Albums", crate::settings::LibraryShelf::Albums),
+            ("Podcasts", crate::settings::LibraryShelf::Podcasts),
+            ("Playlists", crate::settings::LibraryShelf::Playlists),
+        ] {
+            accessible_frame(&ctx, &mut app, vec![]);
+            let tree = accessible_frame(&ctx, &mut app, vec![]);
+            let id = accessible_node(&tree, label, egui::accesskit::Role::Button);
+            let key = egui::Id::new("sidebar-filter");
+            for expected in [Some(shelf), None] {
+                accessible_frame(
+                    &ctx,
+                    &mut app,
+                    vec![accessible_action(id, egui::accesskit::Action::Click, None)],
+                );
+                assert_eq!(
+                    ctx.data(|data| data.get_temp::<Option<crate::settings::LibraryShelf>>(key))
+                        .unwrap(),
+                    expected
+                );
+            }
+        }
+        app.backend.shutdown();
+    }
+
     fn accessible_action(
         target: egui::accesskit::NodeId,
         action: egui::accesskit::Action,
@@ -1656,7 +1755,13 @@ mod tests {
             let search = accessible_node(&tree, &gettext(locale, "Search"), Role::Button);
             accessible_node(&tree, &gettext(locale, "Create a playlist"), Role::Button);
             accessible_node(&tree, &gettext(locale, "Albums"), Role::Button);
-            accessible_node(&tree, &gettext(locale, "Artists"), Role::Button);
+            assert!(
+                !tree
+                    .nodes
+                    .iter()
+                    .any(|(_, node)| node.role() == Role::Button
+                        && node.label() == Some(gettext(locale, "Artists").as_ref()))
+            );
             let liked = accessible_node(&tree, &gettext(locale, "Liked Songs"), Role::Button);
             accessible_frame(
                 &ctx,
@@ -2738,7 +2843,6 @@ mod tests {
         use crate::settings::{LibraryShelf, LibrarySort};
         for (shelf, label, page) in [
             (LibraryShelf::Albums, "Albums", Page::Albums),
-            (LibraryShelf::Artists, "Artists", Page::Artists),
             (LibraryShelf::Podcasts, "Podcasts", Page::Podcasts),
         ] {
             let (ctx, mut app) = accessible_app(&format!("library-sort-paging-{shelf:?}"));
@@ -9377,7 +9481,7 @@ mod tests {
             );
             output.textures_delta.clear();
         }
-        for (id, right) in [("sidebar", false), ("now-playing-panel", true)] {
+        for (id, right) in [("sidebar", false), (crate::ui::RIGHT_PANEL_ID, true)] {
             let rect = egui::containers::panel::PanelState::load(&ctx, egui::Id::new(id))
                 .unwrap()
                 .outer_rect;

@@ -17,19 +17,61 @@ fn card(ui: &mut egui::Ui, palette: &theme::Palette, content: impl FnOnce(&mut e
         });
 }
 
+pub fn restore_tab(app: &mut App, ui: &mut egui::Ui) {
+    let palette = app.palette;
+    egui::Panel::right("now-playing-restore-tab")
+        .exact_size(38.0)
+        .resizable(false)
+        .show_separator_line(false)
+        .frame(
+            egui::Frame::new()
+                .fill(palette.panel)
+                .corner_radius(8)
+                .outer_margin(4),
+        )
+        .show(ui, |ui| {
+            let label = gettext(app.locale, "Now playing");
+            let response = ui
+                .allocate_rect(ui.max_rect(), egui::Sense::click())
+                .on_hover_cursor(egui::CursorIcon::PointingHand)
+                .on_hover_text(label.as_ref());
+            response.widget_info(|| {
+                egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), label.as_ref())
+            });
+            theme::paint_icon(
+                ui,
+                Icon::ChevronLeft,
+                response.rect,
+                18.0,
+                if response.hovered() || response.has_focus() {
+                    palette.text
+                } else {
+                    palette.secondary
+                },
+            );
+            if response.clicked() {
+                app.actions.push(Action::ToggleNowPlayingPanel);
+            }
+        });
+}
+
 pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
+    let chosen = app
+        .settings
+        .right_panel_width
+        .unwrap_or(app.settings.lyrics_width);
     let palette = app.palette;
     let fit = super::yielding_panel(
         ui.ctx(),
-        "now-playing-panel",
-        theme::SIDE_PANEL_MIN_WIDTH..=640.0,
-        app.settings.lyrics_width,
+        super::RIGHT_PANEL_ID,
+        theme::SIDE_PANEL_MIN_WIDTH..=super::RIGHT_PANEL_MAX_WIDTH,
+        chosen,
         ui.available_width() - super::page_min_width(app, ui.ctx()),
     );
     app.actions.push(Action::LoadNowPlayingArtists);
     let panel_style = super::begin_panel_resize(app, ui);
-    let response = egui::Panel::right("now-playing-panel")
-        .default_size(app.settings.lyrics_width)
+    let response = egui::Panel::right(super::RIGHT_PANEL_ID)
+        .default_size(chosen)
         .size_range(fit.range.clone())
         .resizable(true)
         .show_separator_line(false)
@@ -57,10 +99,32 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
                         .as_ref()
                         .map(|from| from.name.clone())
                         .unwrap_or_else(|| gettext(app.locale, "Now playing").into_owned());
-                    if theme::link(ui, &title, theme::bold(16.0), palette.text).clicked()
-                        && let Some(page) = from.and_then(|from| from.page)
-                    {
+                    let mut open_page = None;
+                    let mut hide = false;
+                    egui::Sides::new().shrink_left().show(
+                        ui,
+                        |ui| {
+                            if theme::link(ui, &title, theme::bold(16.0), palette.text).clicked() {
+                                open_page = from.and_then(|from| from.page);
+                            }
+                        },
+                        |ui| {
+                            hide = theme::icon_button(
+                                ui,
+                                Icon::ChevronRight,
+                                18.0,
+                                palette.secondary,
+                                palette.text,
+                                &gettext(app.locale, "Close"),
+                            )
+                            .clicked();
+                        },
+                    );
+                    if let Some(page) = open_page {
                         app.actions.push(Action::Open(page));
+                    }
+                    if hide {
+                        app.actions.push(Action::ToggleNowPlayingPanel);
                     }
                     ui.add_space(14.0);
                     egui::ScrollArea::vertical()
@@ -101,6 +165,7 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
                             }
                             ui.add_space(12.0);
                             let saved = app.is_saved(&now.uri).unwrap_or(false);
+                            let saved_icon = widgets::saved_track_icon(app, saved);
                             let locale = app.locale;
                             let mut copy = false;
                             let mut save = false;
@@ -160,11 +225,7 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
                                         );
                                         if theme::icon_button(
                                             ui,
-                                            if saved {
-                                                Icon::CircleCheck
-                                            } else {
-                                                Icon::CirclePlus
-                                            },
+                                            saved_icon,
                                             20.0,
                                             if saved {
                                                 palette.accent
@@ -444,15 +505,10 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
         app,
         ui,
         panel_style,
-        "now-playing-panel",
+        super::RIGHT_PANEL_ID,
         true,
         response.response.rect,
     );
     let width = response.response.rect.width();
-    if (width - app.settings.lyrics_width).abs() > 1.0
-        && super::panel_width_chosen(ui.ctx(), "now-playing-panel", &fit)
-    {
-        app.settings.lyrics_width = width;
-        app.actions.push(Action::SettingsChanged);
-    }
+    super::remember_right_panel_width(app, ui.ctx(), width, &fit);
 }

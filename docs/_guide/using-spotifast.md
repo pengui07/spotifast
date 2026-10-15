@@ -5,6 +5,23 @@ description: Play music, arrange playlists, find lyrics, and make Spotifast your
 nav_order: 3
 ---
 
+Click the Settings button again to return to the previous page. Clicking
+either device-picker button again dismisses the Connect popup.
+
+Shuffle and Repeat show a green dot beneath their icons while enabled. Repeat
+shows the dot for both repeating the context and repeating a single song.
+
+With Faithful UI enabled, turn on **Settings > Appearance > Use hearts for
+saved songs** to replace song plus/check icons with outline and filled hearts.
+This applies to song rows, song menus, the player bar, and the Now playing
+side panel. The default remains plus/check icons.
+
+The Now playing side panel has a hide button in its header. When hidden, a
+slim tab remains on the right edge; click anywhere on the tab to bring the panel back.
+Now playing, Lyrics, Queue, and Listening activity share the width you choose.
+Switching views keeps that width, and a temporarily narrow window does not
+overwrite it. The hidden state and chosen width are remembered after restarting.
+
 ## Middle-click autoscroll
 
 On Windows, since 0.8.0, and on Linux once turned on, middle-click a scrolling
@@ -326,6 +343,12 @@ Portable archives identify themselves with `spotifast-portable.txt`.
 
 ## Library order
 
+The Library starts with playlists, saved albums, and podcasts together. The
+Artists category has been removed. Choose **Playlists**, **Albums**, or
+**Podcasts** to filter the list; choose the same button again to return to
+everything. Search applies across the visible categories, and pins stay at
+the top. Each category keeps its existing order within the combined list.
+
 Since 0.8.0, Settings has a Library section that selects an order for each
 section. It is no longer a menu below the Library filters. **Name** and **Recently played** are available throughout.
 Albums and podcasts also offer **Recently added**, using their actual save
@@ -491,7 +514,8 @@ snap the window, and drag a window edge or corner to resize it.
 
 ## Listening activity
 
-The people button in the player bar, beside Queue and Lyrics, opens what the
+The people button in the top bar, between Settings and the visualizer and
+mini-player controls, opens what the
 people you follow on Spotify are listening to. It takes the place of the
 Queue or Lyrics panel on the right, and they take its place in turn. While
 it is open it refreshes every 15 seconds.
@@ -503,8 +527,8 @@ album, the artist opens their page, and the line below opens the playlist,
 album or artist it plays from.
 
 The panel needs playback on this computer, since only that session can read
-it. In a very narrow window the people button gives way so the playback
-controls keep their room; widen the window to bring it back.
+it. In a very narrow window, Listening activity is available in the account
+menu when the top bar's secondary controls collapse.
 
 ## Radio
 
@@ -552,8 +576,8 @@ the middle of the screen.
 Since 0.10.0, quitting while lyrics are full screen no longer leaves
 the next launch stuck in full screen: the window returns to its previous size.
 
-To see just the cover, choose the **Now playing view** button at the end of
-the player bar. The playing song's cover fills the window over its blurred
+To see just the cover, choose the **Now playing view** button to the right of
+the volume slider in the player bar. The playing song's cover fills the window over its blurred
 artwork, with the title and artists beneath, beside the queue or lyrics panel
 if one is open. Choose the cover to open its album. The expand button in the
 view's header fills the screen with it; the view works the same either way.

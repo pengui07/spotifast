@@ -58,17 +58,21 @@ fn mark_hovered_line(
 }
 
 pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
+    let chosen = app
+        .settings
+        .right_panel_width
+        .unwrap_or(app.settings.lyrics_width);
     let palette = app.palette;
     let fit = super::yielding_panel(
         ui.ctx(),
-        "lyrics-panel",
-        theme::SIDE_PANEL_MIN_WIDTH..=640.0,
-        app.settings.lyrics_width,
+        super::RIGHT_PANEL_ID,
+        theme::SIDE_PANEL_MIN_WIDTH..=super::RIGHT_PANEL_MAX_WIDTH,
+        chosen,
         ui.available_width() - super::page_min_width(app, ui.ctx()),
     );
-    let panel = egui::Panel::right("lyrics-panel")
+    let panel = egui::Panel::right(super::RIGHT_PANEL_ID)
         .resizable(true)
-        .default_size(app.settings.lyrics_width)
+        .default_size(chosen)
         .size_range(fit.range.clone())
         .show_separator_line(false)
         .frame(
@@ -146,17 +150,12 @@ pub fn side_panel(app: &mut App, ui: &mut egui::Ui) {
         app,
         ui,
         panel_style,
-        "lyrics-panel",
+        super::RIGHT_PANEL_ID,
         true,
         response.response.rect,
     );
     let current_width = response.response.rect.width();
-    if (app.settings.lyrics_width - current_width).abs() > 1.0
-        && super::panel_width_chosen(ui.ctx(), "lyrics-panel", &fit)
-    {
-        app.settings.lyrics_width = current_width;
-        app.actions.push(Action::SettingsChanged);
-    }
+    super::remember_right_panel_width(app, ui.ctx(), current_width, &fit);
 }
 
 fn contents(app: &mut App, ui: &mut egui::Ui) {

@@ -1102,6 +1102,8 @@ pub enum Action {
     ConfigurePersonalWebApp,
     OpenPersonalAppSetup,
     ToggleSidebar,
+    ToggleNowPlayingPanel,
+    SetRightPanelWidth(f32),
     ToggleQueuePanel,
     ToggleLyricsPanel,
     /// Show or hide what friends are listening to, in the right panel.
@@ -1116,6 +1118,7 @@ pub enum Action {
     PauseLyricsFollow,
     RetryLyrics,
     ToggleDevicesPopup,
+    DismissDevicesPopup,
     /// Ask GitHub for the latest release and report the result to the user.
     CheckForUpdates,
     ShowUpdate,
@@ -1163,6 +1166,7 @@ pub enum Action {
     /// Windows: draw Spotifast's own title bar instead of the standard one.
     SetCustomTitlebar(bool),
     SetFaithfulVisuals(bool),
+    SetFaithfulHeartIcons(bool),
     OpenSkinsFolder,
     /// Pick a different skin each time the mini player opens.
     SetRandomSkin(bool),

@@ -31,6 +31,15 @@ This fork checks for and downloads app updates from
 [pengui07/spotifast releases](https://github.com/pengui07/spotifast/releases).
 The queue and Repeat selection are remembered when you close and reopen the app.
 An active playlist's big Play button resumes its current song and queue.
+Listening activity sits beside Settings in the top bar. The Now playing view
+button sits to the right of the volume slider.
+Click Settings or a device-picker button again to dismiss its view.
+The Now playing side panel can collapse to a slim restore tab. Right-panel
+views keep the same width when you switch between them.
+The Library shows playlists, albums, and podcasts together. Its category
+buttons toggle filters; click the selected category again to show everything.
+Active Shuffle and Repeat controls show an accent dot underneath.
+Faithful UI offers an optional heart style for saved songs in Appearance settings.
 
 ![Spotifast Home with the playlist library, recommendations, queue, and player visible](docs/screenshot.png)
 
