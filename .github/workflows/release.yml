@@ -186,10 +186,19 @@ jobs:
 
       - name: Package, sign and notarize macOS app
         run: |
+          # native-packages accepts 1.2.3 or 1.2.3-alpha.N, -beta.N and -rc.N
+          # versions only, so a fork prerelease such as v0.1.0-pengui is
+          # packaged under its numeric base version and published under the
+          # tag's own name. The app inside keeps the full version, which the
+          # App bundle step wrote and the release uploads unchanged.
+          tag="$GITHUB_REF_NAME"
+          base="${tag#v}"
           native-packages build \
-            --version "${GITHUB_REF_NAME#v}" --target macos-universal --defer-recipes \
+            --version "${base%%-*}" --target macos-universal --defer-recipes \
             --output "$RUNNER_TEMP/macos-packages"
-          cp "$RUNNER_TEMP/macos-packages/packages/macos-universal/dmg/"*.dmg dist/
+          set -- "$RUNNER_TEMP/macos-packages/packages/macos-universal/dmg/"*.dmg
+          test "$#" -eq 1
+          cp "$1" "dist/spotifast-${tag}-macos-universal.dmg"
 
       - uses: actions/upload-artifact@v7
         with:

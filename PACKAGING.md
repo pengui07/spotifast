@@ -141,6 +141,11 @@ to package it. Native Mac builds pass `--defer-recipes`, so they do not require
 Linux inputs, AUR tooling or the not-yet-published DMG for Homebrew. The Linux
 packaging job selects `linux-amd64,linux-arm64` from the same configuration
 after the release assets exist and generates downstream recipes then.
+The shared CLI accepts only `1.2.3` or `1.2.3-alpha.N`, `-beta.N` and `-rc.N`
+versions. This fork's prerelease tags carry the fork's own `-pengui` suffix, so
+the job packages them under their numeric base version and names the DMG after
+the tag, `spotifast-v0.1.0-pengui-macos-universal.dmg`. The app bundle and the
+release downloads keep the full tag version.
 The shared gem signs its owned input copy, notarizes the DMG, staples and validates
 Apple's ticket, and only then records final checksums. Configure these repository
 secrets, which the job exposes as environment variables:
