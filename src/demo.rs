@@ -1658,7 +1658,7 @@ mod tests {
     fn library_category_buttons_toggle_back_to_the_combined_view() {
         let (ctx, mut app) = accessible_app("library-category-toggles");
         app.backend.set_offline(true);
-        apply_flags(&mut app, Some("playlist:pl1"), None);
+        app.open(Page::Playlist("pl1".into()));
         for (label, shelf) in [
             ("Albums", crate::settings::LibraryShelf::Albums),
             ("Podcasts", crate::settings::LibraryShelf::Podcasts),
