@@ -8,6 +8,11 @@ does not need the upstream signing secret. Tags containing a suffix, such as
 updates. The ordinary updater checks stable releases, so install prereleases
 from GitHub manually.
 
+Generated Homebrew and AUR recipes download this fork's release files. The
+public Homebrew tap and AUR destinations below still belong to upstream;
+this fork does not publish to them. GitHub downloads and the in-app updater
+remain available without those package repositories.
+
 Before changing a release version, run the **Nix vendor hash** workflow with
 the new Cargo version. Copy its calculated hash into `flake.nix`, then let
 the full Nix CI job verify the final release commit before pushing its tag.
