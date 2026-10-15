@@ -7,6 +7,7 @@ pub mod collection;
 mod details;
 pub(crate) mod devices;
 mod dialogs;
+pub(crate) mod friends;
 pub mod home;
 mod keys;
 pub mod library;
@@ -118,7 +119,11 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         if app.show_lyrics_panel {
             lyrics::side_panel(app, ui);
         }
-        let now_playing_visible = app.now_playing_panel_visible()
+        if app.show_friends_panel {
+            friends::side_panel(app, ui);
+        }
+        let now_playing_visible = !app.show_friends_panel
+            && app.now_playing_panel_visible()
             && ui.available_width() >= page_min_width(app, ctx) + theme::SIDE_PANEL_MIN_WIDTH;
         ctx.data_mut(|data| {
             data.insert_temp(Id::new("now-playing-panel-visible"), now_playing_visible)
@@ -210,7 +215,7 @@ fn keep_room_for_panels(app: &App, ctx: &Context) {
     let width = main_min_width(
         page_min_width(app, ctx),
         app.settings.sidebar_visible,
-        app.show_queue_panel || app.show_lyrics_panel,
+        app.show_queue_panel || app.show_lyrics_panel || app.show_friends_panel,
     )
     .round();
     let id = Id::new("main-min-width");

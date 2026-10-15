@@ -3143,3 +3143,24 @@ msgstr "忠實介面"
 #: src/ui/settings.rs
 msgid "Use Spotify-style panels, navigation, and playback controls. Adds Now Playing view."
 msgstr "使用 Spotify 風格的面板、導覽和播放控制項，並新增現正播放檢視。"
+
+#: src/ui/player_bar.rs:967 src/ui/friends.rs:53
+msgid "Listening activity"
+msgstr "收聽動態"
+
+#: src/ui/friends.rs:111
+msgid "No listening activity"
+msgstr "暫無收聽動態"
+
+#: src/ui/friends.rs:114
+msgid "What the people you follow play on Spotify shows here."
+msgstr "你追蹤的人在 Spotify 上播放的內容會顯示在這裡。"
+
+#: src/ui/friends.rs:192
+#, rust-format
+msgid "Play {song}"
+msgstr "播放 {song}"
+
+#: src/ui/friends.rs:221
+msgid "Listening now"
+msgstr "正在收聽"

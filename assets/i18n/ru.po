@@ -3257,3 +3257,25 @@ msgstr "Интерфейс как в Spotify"
 #: src/ui/settings.rs
 msgid "Use Spotify-style panels, navigation, and playback controls. Adds Now Playing view."
 msgstr "Панели, навигация и управление воспроизведением в стиле Spotify. Добавляет панель текущего трека."
+
+#: src/ui/player_bar.rs:967 src/ui/friends.rs:53
+msgid "Listening activity"
+msgstr "Что слушают"
+
+#: src/ui/friends.rs:111
+msgid "No listening activity"
+msgstr "Никто ничего не слушал"
+
+#: src/ui/friends.rs:114
+msgid "What the people you follow play on Spotify shows here."
+msgstr ""
+"Здесь появится то, что слушают в Spotify люди, на которых вы подписаны."
+
+#: src/ui/friends.rs:192
+#, rust-format
+msgid "Play {song}"
+msgstr "Слушать {song}"
+
+#: src/ui/friends.rs:221
+msgid "Listening now"
+msgstr "Слушает сейчас"

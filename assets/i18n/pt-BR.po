@@ -3232,3 +3232,24 @@ msgstr "Interface fiel"
 #: src/ui/settings.rs
 msgid "Use Spotify-style panels, navigation, and playback controls. Adds Now Playing view."
 msgstr "Usa painéis, navegação e controles de reprodução no estilo do Spotify. Adiciona a visualização da faixa em reprodução."
+
+#: src/ui/player_bar.rs:967 src/ui/friends.rs:53
+msgid "Listening activity"
+msgstr "Atividade de audição"
+
+#: src/ui/friends.rs:111
+msgid "No listening activity"
+msgstr "Nenhuma atividade de audição"
+
+#: src/ui/friends.rs:114
+msgid "What the people you follow play on Spotify shows here."
+msgstr "O que as pessoas que você segue ouvem no Spotify aparece aqui."
+
+#: src/ui/friends.rs:192
+#, rust-format
+msgid "Play {song}"
+msgstr "Tocar {song}"
+
+#: src/ui/friends.rs:221
+msgid "Listening now"
+msgstr "Ouvindo agora"

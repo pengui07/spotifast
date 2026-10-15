@@ -40,6 +40,9 @@ https://github.com/user-attachments/assets/a5f669ce-b3b7-4f8e-9933-976a78876c7e
 
 ## Your music, on your desktop
 
+Listening activity shows what the people you follow are playing. Open it from
+the people button beside Lyrics and Queue while local playback is enabled.
+
 | Feature | What you can do |
 |---|---|
 | **Library and search** | Browse playlists, Liked Songs, albums, artists, and podcasts. Search the catalogue and edit playlists you own. |

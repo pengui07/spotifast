@@ -3258,3 +3258,24 @@ msgstr "Originalgetreue Oberfläche"
 #: src/ui/settings.rs
 msgid "Use Spotify-style panels, navigation, and playback controls. Adds Now Playing view."
 msgstr "Verwendet Bereiche, Navigation und Wiedergabesteuerung im Spotify-Stil. Fügt die Ansicht zur aktuellen Wiedergabe hinzu."
+
+#: src/ui/player_bar.rs:967 src/ui/friends.rs:53
+msgid "Listening activity"
+msgstr "Höraktivität"
+
+#: src/ui/friends.rs:111
+msgid "No listening activity"
+msgstr "Keine Höraktivität"
+
+#: src/ui/friends.rs:114
+msgid "What the people you follow play on Spotify shows here."
+msgstr "Hier erscheint, was die Leute, denen du folgst, auf Spotify hören."
+
+#: src/ui/friends.rs:192
+#, rust-format
+msgid "Play {song}"
+msgstr "{song} abspielen"
+
+#: src/ui/friends.rs:221
+msgid "Listening now"
+msgstr "Hört gerade"

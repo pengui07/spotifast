@@ -3224,3 +3224,24 @@ msgstr "Troget gränssnitt"
 #: src/ui/settings.rs
 msgid "Use Spotify-style panels, navigation, and playback controls. Adds Now Playing view."
 msgstr "Använd paneler, navigering och uppspelningskontroller i Spotify-stil. Lägger till en vy för det som spelas nu."
+
+#: src/ui/player_bar.rs:967 src/ui/friends.rs:53
+msgid "Listening activity"
+msgstr "Lyssningsaktivitet"
+
+#: src/ui/friends.rs:111
+msgid "No listening activity"
+msgstr "Ingen lyssningsaktivitet"
+
+#: src/ui/friends.rs:114
+msgid "What the people you follow play on Spotify shows here."
+msgstr "Här visas vad personerna du följer spelar på Spotify."
+
+#: src/ui/friends.rs:192
+#, rust-format
+msgid "Play {song}"
+msgstr "Spela {song}"
+
+#: src/ui/friends.rs:221
+msgid "Listening now"
+msgstr "Lyssnar nu"

@@ -3262,3 +3262,24 @@ msgstr "Wierny interfejs"
 #: src/ui/settings.rs
 msgid "Use Spotify-style panels, navigation, and playback controls. Adds Now Playing view."
 msgstr "Używaj paneli, nawigacji i sterowania odtwarzaniem w stylu Spotify. Dodaje widok odtwarzanego utworu."
+
+#: src/ui/player_bar.rs:967 src/ui/friends.rs:53
+msgid "Listening activity"
+msgstr "Aktywność słuchania"
+
+#: src/ui/friends.rs:111
+msgid "No listening activity"
+msgstr "Brak aktywności słuchania"
+
+#: src/ui/friends.rs:114
+msgid "What the people you follow play on Spotify shows here."
+msgstr "Tu pojawia się to, czego słuchają na Spotify obserwowane osoby."
+
+#: src/ui/friends.rs:192
+#, rust-format
+msgid "Play {song}"
+msgstr "Odtwórz {song}"
+
+#: src/ui/friends.rs:221
+msgid "Listening now"
+msgstr "Słucha teraz"
