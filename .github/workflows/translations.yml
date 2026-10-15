@@ -1,0 +1,28 @@
+name: Translation catalogs
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  catalogs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: cachix/install-nix-action@v31
+      - name: Refresh catalogs with Rust-capable gettext
+        run: |
+          nixpkgs=$(python3 -c 'import json; print(json.load(open("flake.lock"))["nodes"]["nixpkgs"]["locked"]["rev"])')
+          nix shell "github:NixOS/nixpkgs/$nixpkgs#gettext" --command bash .github/scripts/update-translations.sh
+          nix shell "github:NixOS/nixpkgs/$nixpkgs#gettext" --command bash .github/scripts/update-translations.sh --check
+      - uses: actions/upload-artifact@v7
+        with:
+          name: translation-catalogs
+          path: |
+            assets/i18n/*.po
+            assets/i18n/*.pot
+          if-no-files-found: error
