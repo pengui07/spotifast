@@ -15966,8 +15966,8 @@ mod tests {
         app.backend.shutdown();
     }
 
-    /// The Listening activity button sits in the player bar beside Lyrics,
-    /// and gives way in a narrow window before it crowds Repeat.
+    /// Listening activity stays in the header after the visualizer and mini
+    /// player, separate from playback controls, across normal window widths.
     #[cfg(feature = "demo")]
     #[test]
     fn the_listening_activity_button_never_crowds_the_transport() {
@@ -15976,7 +15976,6 @@ mod tests {
         let mut app = test_app("friends-button-room");
         app.attach(&ctx);
         crate::demo::populate(&mut app);
-        let mut shown_at = None;
         for width in (760..=1600).step_by(8) {
             let width = width as f32;
             let mut tree = None;
@@ -16004,16 +16003,19 @@ mod tests {
             };
             let repeat = button("Repeat").expect("Repeat");
             let lyrics = button("Lyrics").expect("Lyrics");
-            if let Some(friends) = button("Listening activity") {
-                shown_at.get_or_insert(width);
-                assert!(friends.y0 > 700.0, "in the player bar at {width}");
-                assert!(friends.x1 <= lyrics.x0, "before Lyrics at {width}");
-                assert!(friends.x0 - repeat.x1 >= 10.0, "clear of Repeat at {width}");
-            } else {
-                assert!(shown_at.is_none(), "it stays once shown, gone at {width}");
-            }
+            let friends = button("Listening activity").expect("Listening activity in the header");
+            let settings = button("Settings").expect("Settings");
+            let mini = button("Winamp mini player").expect("Winamp mini player");
+            let visualizer = button("MilkDrop visualiser").expect("MilkDrop visualiser");
+            assert!(friends.y1 <= lyrics.y0, "above Lyrics at {width}");
+            assert!(friends.y1 <= repeat.y0, "clear of Repeat at {width}");
+            assert!(friends.x1 <= settings.x0, "beside Settings at {width}");
+            assert!(mini.x1 <= friends.x0, "after the mini player at {width}");
+            assert!(
+                visualizer.x1 <= friends.x0,
+                "after the visualizer at {width}"
+            );
         }
-        assert!(shown_at.is_some(), "the button appears when there is room");
         app.backend.shutdown();
     }
 
