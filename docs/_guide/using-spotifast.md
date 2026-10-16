@@ -8,6 +8,9 @@ nav_order: 3
 Click the Settings button again to return to the previous page. Clicking
 either device-picker button again dismisses the Connect popup.
 
+Home's eight shortcuts use two columns in narrower windows and four in wider
+windows. They never switch to three columns with an incomplete final row.
+
 Shuffle and Repeat show a green dot beneath their icons while enabled. Repeat
 shows the dot for both repeating the context and repeating a single song.
 

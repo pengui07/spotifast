@@ -39,6 +39,7 @@ views keep the same width when you switch between them.
 The Library shows playlists, albums, and podcasts together. Its category
 buttons toggle filters; click the selected category again to show everything.
 Recent plays rank albums alongside playlists, with pinned items kept at the top.
+Home's eight shortcuts use two or four columns, keeping every row complete.
 Active Shuffle and Repeat controls show an accent dot underneath.
 Faithful UI offers an optional heart style for saved songs in Appearance settings.
 

@@ -42,6 +42,10 @@ struct Tile {
     owned_playlist: Option<Playlist>,
 }
 
+fn quick_access_columns(available: f32) -> usize {
+    if available >= 1200.0 { 4 } else { 2 }
+}
+
 fn quick_access(app: &mut App, ui: &mut egui::Ui) {
     let palette = app.palette;
     let mut tiles: Vec<Tile> = vec![Tile {
@@ -71,7 +75,7 @@ fn quick_access(app: &mut App, ui: &mut egui::Ui) {
         }
     }
     let available = ui.available_width();
-    let columns = ((available / 300.0).floor() as usize).clamp(2, 4);
+    let columns = quick_access_columns(available);
     let gap = 10.0;
     let tile_width = (available - gap * (columns as f32 - 1.0)) / columns as f32;
     let rows = tiles.len().div_ceil(columns);
@@ -726,6 +730,17 @@ fn recommendations(app: &mut App, ui: &mut egui::Ui) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn eight_shortcuts_always_fill_two_or_four_columns() {
+        for width in [320.0, 600.0, 899.0, 900.0, 1050.0, 1199.0, 1200.0, 1600.0] {
+            let columns = super::quick_access_columns(width);
+            assert!(matches!(columns, 2 | 4), "width {width}: {columns} columns");
+            assert_eq!(8 % columns, 0, "width {width}: incomplete shortcut row");
+        }
+        assert_eq!(super::quick_access_columns(1199.0), 2);
+        assert_eq!(super::quick_access_columns(1200.0), 4);
+    }
+
     use super::*;
     use crate::api::models::ResumePoint;
 
