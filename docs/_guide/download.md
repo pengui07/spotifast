@@ -5,12 +5,12 @@ nav_order: 1
 ---
 
 {% assign v = site.spotifast_version %}
-{% assign base = "https://github.com/crmne/spotifast/releases/download/v" | append: v %}
+{% assign base = "https://github.com/pengui07/spotifast/releases/download/v" | append: v %}
 
 The current version is **v{{ v }}**. You can use the
 [download checksums]({{ base }}/checksums.txt) to check that a file has not
 been damaged or changed. Older versions are on the
-[releases page](https://github.com/crmne/spotifast/releases).
+[releases page](https://github.com/pengui07/spotifast/releases).
 
 ## macOS
 
@@ -20,7 +20,8 @@ One download for both Apple Silicon and Intel:
 
 Open the downloaded file and drag **Spotifast** to **Applications**.
 
-If you use [Homebrew](https://brew.sh), you can install it with:
+The Homebrew cask below installs upstream Spotifast, not this fork.
+Use the Mac download above for this fork. If you want upstream instead:
 
 ```sh
 brew install --cask crmne/tap/spotifast
@@ -31,13 +32,8 @@ brew install --cask crmne/tap/spotifast
 Open **Spotifast** from Applications. If your Mac asks whether you want to
 open an app downloaded from the internet, choose **Open**.
 
-Starting with 0.8.0, the Mac download passes Apple's security checks. You do
-not need to change security settings or run commands in Terminal to open it.
-
-Quit the old app before opening Spotifast. Your saved settings and sign-ins
-carry over. If an older version reports that its update helper exited before
-it was ready, install the DMG above manually once. The helper changes take
-effect for updates started from 0.9.1 onward.
+These fork builds do not carry the upstream project's signing and notarization
+guarantee. Your saved settings and sign-ins carry over when updating.
 
 ## Windows
 
@@ -69,8 +65,8 @@ in Windows.
 
 ### Arch Linux
 
-Spotifast is in the AUR, Arch's community package collection. Installing it
-also adds it to your app launcher:
+The AUR packages below install upstream Spotifast, not this fork. Use this
+fork's AppImage or Linux archive below for 0.1.0. To install upstream:
 
 ```sh
 yay -S spotifast-bin      # the released build, ready made
@@ -128,11 +124,11 @@ Or build from source: see the [build instructions](/getting-started/#build-from-
 
 ## Nix
 
-Add the repository [flake](https://github.com/crmne/spotifast) to your
+Add the repository [flake](https://github.com/pengui07/spotifast) to your
 inputs:
 
 ```nix
-inputs.spotifast.url = "github:crmne/spotifast";
+inputs.spotifast.url = "github:pengui07/spotifast";
 ```
 
 On NixOS, install the default package:

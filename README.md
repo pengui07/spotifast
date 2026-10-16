@@ -7,7 +7,7 @@
 <p align="center"><strong>Spotify, native and fast.</strong><br>A lightweight music app for Linux, macOS, and Windows.</p>
 
 <p align="center">
-  <a href="https://spotifast.rocks/download/"><strong>Download</strong></a> ·
+  <a href="https://github.com/pengui07/spotifast/releases/latest"><strong>Download</strong></a> ·
   <a href="https://spotifast.rocks/getting-started/">Getting started</a> ·
   <a href="https://spotifast.rocks/using-spotifast/">User guide</a> ·
   <a href="CONTRIBUTING.md">Contribute</a>
@@ -15,7 +15,7 @@
 
 <p align="center">
   <a href="Cargo.toml"><img src="https://img.shields.io/badge/Built_with-Rust-1ed760" alt="Built with Rust"></a>
-  <a href="https://spotifast.rocks/download/"><img src="https://img.shields.io/badge/Linux_%C2%B7_macOS_%C2%B7_Windows-24292f" alt="Linux, macOS, and Windows"></a>
+  <a href="https://github.com/pengui07/spotifast/releases/latest"><img src="https://img.shields.io/badge/Linux_%C2%B7_macOS_%C2%B7_Windows-24292f" alt="Linux, macOS, and Windows"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-1ed760" alt="MIT license"></a>
 </p>
 
@@ -55,7 +55,7 @@ https://github.com/user-attachments/assets/a5f669ce-b3b7-4f8e-9933-976a78876c7e
 ## Your music, on your desktop
 
 Listening activity shows what the people you follow are playing. Open it from
-the people button beside Lyrics and Queue while local playback is enabled.
+the people button beside Settings while local playback is enabled.
 
 | Feature | What you can do |
 |---|---|
@@ -71,11 +71,14 @@ the people button beside Lyrics and Queue while local playback is enabled.
 
 | Platform | Installation |
 |---|---|
-| **macOS** | `brew install --cask crmne/tap/spotifast`, or [download the Mac app](https://spotifast.rocks/download/#macos). |
-| **Arch Linux** | `yay -S spotifast-bin` |
-| **Windows** | Choose your build on the [Download page](https://spotifast.rocks/download/). |
-| **Other Linux** | Find Flatpak, AppImage, Nix, and other options on the [Download page](https://spotifast.rocks/download/). |
+| **macOS** | [Download the universal Mac app](https://github.com/pengui07/spotifast/releases/latest). |
+| **Arch Linux** | Use the [Linux downloads](https://github.com/pengui07/spotifast/releases/latest). |
+| **Windows** | Choose your build on the [Download page](https://github.com/pengui07/spotifast/releases/latest). |
+| **Other Linux** | Find Flatpak, AppImage, DEB, RPM, and archives on the [Download page](https://github.com/pengui07/spotifast/releases/latest). |
 | **From source** | Follow [Build from source](https://spotifast.rocks/getting-started/#build-from-source) for dependencies and commands. |
+
+Homebrew (`crmne/tap/spotifast`) and AUR packages install upstream Spotifast.
+Use the downloads above for this fork.
 
 ## Start listening
 
