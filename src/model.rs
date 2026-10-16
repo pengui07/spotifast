@@ -119,6 +119,7 @@ pub enum Page {
     Playlist(String),
     Album(String),
     Artist(String),
+    Discography(String),
     Show(String),
     /// Spotify's radio seeded by a song, playlist, album, or artist, by the
     /// seed's URI.
@@ -141,6 +142,7 @@ impl Page {
             Page::Playlist(id) => format!("playlist:{id}"),
             Page::Album(id) => format!("album:{id}"),
             Page::Artist(id) => format!("artist:{id}"),
+            Page::Discography(id) => format!("discography:{id}"),
             Page::Show(id) => format!("show:{id}"),
             Page::Radio(seed) => format!("radio:{seed}"),
             Page::Queue => "queue".into(),
@@ -166,6 +168,7 @@ impl Page {
                     "playlist" => Page::Playlist(id.into()),
                     "album" => Page::Album(id.into()),
                     "artist" => Page::Artist(id.into()),
+                    "discography" => Page::Discography(id.into()),
                     "show" => Page::Show(id.into()),
                     "radio" if crate::util::station_uri(id).is_some() => Page::Radio(id.into()),
                     _ => return None,
@@ -772,6 +775,9 @@ pub struct ArtistPage {
     pub artist: Loadable<Artist>,
     pub top_tracks: Loadable<Vec<Track>>,
     pub albums: HashMap<String, PagedList<Album>>,
+    /// Complete primary releases with Spotify's album popularity scores.
+    pub discography: Loadable<Vec<Album>>,
+    pub discography_generation: u64,
     pub related: Loadable<Vec<Artist>>,
     pub filter: DiscographyFilter,
     pub show_all_top: bool,

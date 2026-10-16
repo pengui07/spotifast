@@ -40,6 +40,9 @@ The Library shows playlists, albums, and podcasts together. Its category
 buttons toggle filters; click the selected category again to show everything.
 Recent plays rank albums alongside playlists, with pinned items kept at the top.
 Home's eight shortcuts use two or four columns, keeping every row complete.
+Artist pages preview five popular releases. Show more opens the discography,
+sorted from newest to oldest. Artist headers show follower counts without genre tags
+and include a Shuffle button beside Play.
 Active Shuffle and Repeat controls show an accent dot underneath.
 Faithful UI offers an optional heart style for saved songs in Appearance settings.
 

@@ -369,7 +369,7 @@ fn page_tint(app: &mut App) -> Option<Color32> {
             .or_else(|| app.known_album(id))
             .and_then(|album| pick_image(&album.images, 64))
             .map(str::to_string),
-        Page::Artist(id) => app
+        Page::Artist(id) | Page::Discography(id) => app
             .artist_pages
             .get(id)
             .and_then(|page| page.artist.get())
@@ -464,6 +464,7 @@ fn central(app: &mut App, ui: &mut egui::Ui) {
                                 Page::Playlist(id) => collection::playlist(app, ui, &id),
                                 Page::Album(id) => collection::album(app, ui, &id),
                                 Page::Artist(id) => artist::show(app, ui, &id),
+                                Page::Discography(id) => artist::discography(app, ui, &id),
                                 Page::Show(id) => show::show(app, ui, &id),
                                 Page::Radio(seed) => radio::radio(app, ui, &seed),
                                 Page::Queue => queue::page(app, ui),

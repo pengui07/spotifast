@@ -367,6 +367,15 @@ pub fn populate(app: &mut App) {
         artist: Loadable::Loaded(artist(0)),
         top_tracks: Loadable::Loaded(tracks.iter().take(10).cloned().collect()),
         related: Loadable::Loaded((1..8).map(artist).collect()),
+        discography: Loadable::Loaded(
+            (0..8)
+                .map(|index| {
+                    let mut album = album(index);
+                    album.popularity = Some(100 - index as u8);
+                    album
+                })
+                .collect(),
+        ),
         ..ArtistPage::default()
     };
     let mut albums = PagedList::default();
@@ -5029,7 +5038,7 @@ mod tests {
                 playlist as fn(&mut App, &mut egui::Ui),
             ),
             ("Fragments", "Bonobo", album),
-            ("Bonobo", "electronic, downtempo, ambient", artist),
+            ("Bonobo", "followers", artist),
             ("Rework", "37signals", show),
         ] {
             let painted = view_frame(&ctx, &mut app, vec![], view);
@@ -5077,7 +5086,7 @@ mod tests {
                 playlist as fn(&mut App, &mut egui::Ui),
             ),
             ("Fragments", "Bonobo", album),
-            ("Bonobo", "electronic, downtempo, ambient", artist),
+            ("Bonobo", "followers", artist),
             ("Rework", "37signals", show),
         ] {
             let painted = view_frame(&ctx, &mut app, vec![], view);
@@ -5657,6 +5666,142 @@ mod tests {
             check_card_menu(&mut app, &ctx, view, section, &title, &uri, &labels);
             app.backend.shutdown();
         }
+    }
+
+    #[test]
+    fn artist_shuffle_button_toggles_without_starting_playback() {
+        use egui::accesskit::{Action as AccessibleAction, Role};
+        let (ctx, mut app) = accessible_app("artist-shuffle-button");
+        app.backend.set_offline(true);
+        app.apply(Action::SetShuffle(false), &ctx);
+        let frame = |app: &mut App, events| {
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1280.0, 2200.0),
+                    )),
+                    events,
+                    ..Default::default()
+                },
+                |ui| crate::ui::artist::show(app, ui, "art0"),
+            );
+            output.textures_delta.clear();
+            output.platform_output.accesskit_update.unwrap()
+        };
+        frame(&mut app, vec![]);
+        let tree = frame(&mut app, vec![]);
+        let x = |label| {
+            let id = accessible_node(&tree, label, Role::Button);
+            tree.nodes
+                .iter()
+                .find(|(held, _)| *held == id)
+                .unwrap()
+                .1
+                .bounds()
+                .unwrap()
+                .x0
+        };
+        assert!(x("Play") < x("Shuffle"));
+        assert!(x("Shuffle") < x("Following"));
+        for (label, expected) in [("Shuffle", true), ("Shuffle off", false)] {
+            let tree = frame(&mut app, vec![]);
+            let shuffle = accessible_node(&tree, label, Role::Button);
+            app.actions.clear();
+            frame(
+                &mut app,
+                vec![accessible_action(shuffle, AccessibleAction::Click, None)],
+            );
+            assert!(
+                matches!(app.actions.as_slice(), [Action::SetShuffle(value)] if *value == expected)
+            );
+            for action in std::mem::take(&mut app.actions) {
+                app.apply(action, &ctx);
+            }
+            assert_eq!(app.playing_context_shuffle(), expected);
+        }
+        app.backend.shutdown();
+    }
+
+    #[test]
+    fn artist_show_more_opens_all_releases_newest_first_and_back_restores_the_preview() {
+        let (ctx, mut app) = accessible_app("artist-discography-navigation");
+        app.backend.set_offline(true);
+        let page = app.artist_pages.get_mut("art0").unwrap();
+        page.top_tracks = Loadable::Loaded(Vec::new());
+        page.related = Loadable::Loaded(Vec::new());
+        page.discography = Loadable::Loaded(
+            (0..6)
+                .map(|index| {
+                    let mut release = album(index);
+                    release.name = format!("Release {index}");
+                    release.popularity = Some(index as u8 * 10);
+                    release.release_date = Some(format!("{}", 2025 - index));
+                    release
+                })
+                .collect(),
+        );
+        app.open(Page::Artist("art0".into()));
+        fn view(app: &mut App, ui: &mut egui::Ui) {
+            match app.page().clone() {
+                Page::Artist(id) => crate::ui::artist::show(app, ui, &id),
+                Page::Discography(id) => crate::ui::artist::discography(app, ui, &id),
+                _ => panic!("expected an artist or discography page"),
+            }
+        }
+        let titles = |painted: &[(String, egui::Rect)]| {
+            painted
+                .iter()
+                .filter(|(text, _)| text.starts_with("Release "))
+                .map(|(text, _)| text.clone())
+                .collect::<Vec<_>>()
+        };
+        view_frame(&ctx, &mut app, vec![], view);
+        let painted = view_frame(&ctx, &mut app, vec![], view);
+        assert!(
+            painted
+                .iter()
+                .all(|(text, _)| !text.contains("electronic, downtempo, ambient"))
+        );
+        assert_eq!(
+            titles(&painted),
+            [
+                "Release 5",
+                "Release 4",
+                "Release 3",
+                "Release 2",
+                "Release 1"
+            ]
+        );
+        let more = sidebar_text(&painted, "Show more").center();
+        app.actions.clear();
+        view_frame(
+            &ctx,
+            &mut app,
+            pointer_click(more, egui::PointerButton::Primary),
+            view,
+        );
+        for action in std::mem::take(&mut app.actions) {
+            app.apply(action, &ctx);
+        }
+        assert_eq!(app.page(), &Page::Discography("art0".into()));
+        let painted = view_frame(&ctx, &mut app, vec![], view);
+        assert_eq!(
+            titles(&painted),
+            [
+                "Release 0",
+                "Release 1",
+                "Release 2",
+                "Release 3",
+                "Release 4",
+                "Release 5"
+            ]
+        );
+        app.apply(Action::Back, &ctx);
+        assert_eq!(app.page(), &Page::Artist("art0".into()));
+        let painted = view_frame(&ctx, &mut app, vec![], view);
+        assert_eq!(titles(&painted).len(), 5);
+        app.backend.shutdown();
     }
 
     #[test]

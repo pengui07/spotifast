@@ -1113,6 +1113,50 @@ impl ApiClient {
         .await
     }
 
+    /// The shared grant supports album batches and their popularity scores.
+    /// Keep the lightweight release rows, including their artist-specific group.
+    pub async fn artist_discography(&self, id: &str) -> Result<Vec<Album>> {
+        let mut albums = Vec::new();
+        let mut seen = HashSet::new();
+        let mut offset = 0;
+        loop {
+            let page = self
+                .artist_albums(id, "album,single,compilation", offset, 50)
+                .await?;
+            let next = page.next_offset();
+            albums.extend(
+                page.items
+                    .into_iter()
+                    .filter(|album| seen.insert(album.id.clone())),
+            );
+            match next {
+                Some(next) if next > offset => offset = next,
+                _ => break,
+            }
+        }
+        #[derive(serde::Deserialize)]
+        struct Albums {
+            albums: Vec<Option<Album>>,
+        }
+        for batch in albums.chunks_mut(20) {
+            let ids = batch
+                .iter()
+                .map(|album| album.id.as_str())
+                .collect::<Vec<_>>()
+                .join(",");
+            let details: Albums = self.get("/albums", &[("ids", ids)]).await?;
+            for album in batch {
+                album.popularity = details
+                    .albums
+                    .iter()
+                    .flatten()
+                    .find(|detail| detail.id == album.id)
+                    .and_then(|detail| detail.popularity);
+            }
+        }
+        Ok(albums)
+    }
+
     pub async fn related_artists(&self, id: &str) -> Result<Vec<Artist>> {
         let related: RelatedArtists = self
             .get(&format!("/artists/{id}/related-artists"), &[])
@@ -1174,6 +1218,105 @@ impl ApiClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn artist_discography_pages_and_batches_scores_without_losing_release_groups() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let rows: Vec<_> = (0..20)
+                .map(|index| {
+                    json!({
+                        "id": format!("a{index}"), "name": format!("Release {index}"),
+                        "album_group": "single", "release_date": "2020"
+                    })
+                })
+                .collect();
+            let scores: Vec<_> = (0..20)
+                .rev()
+                .map(|index| {
+                    json!({
+                        "id": format!("a{index}"), "popularity": index
+                    })
+                })
+                .collect();
+            let bodies = [
+                json!({"items": rows, "limit": 20, "offset": 0, "next": "next-page"}),
+                json!({"items": [{"id": "a19"}, {"id": "a20", "album_group": "album"}],
+                    "limit": 20, "offset": 20, "next": null}),
+                json!({"albums": scores}),
+                json!({"albums": [{"id": "a20", "popularity": 99}]}),
+            ];
+            let mut paths = Vec::new();
+            for body in bodies {
+                let (mut socket, _) =
+                    tokio::time::timeout(Duration::from_secs(5), listener.accept())
+                        .await
+                        .unwrap()
+                        .unwrap();
+                let mut request = Vec::new();
+                while !request.ends_with(b"\r\n\r\n") {
+                    request.push(socket.read_u8().await.unwrap());
+                    assert!(request.len() < 8192);
+                }
+                paths.push(
+                    String::from_utf8(request)
+                        .unwrap()
+                        .lines()
+                        .next()
+                        .unwrap()
+                        .to_string(),
+                );
+                let body = body.to_string();
+                socket.write_all(format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()
+                ).as_bytes()).await.unwrap();
+            }
+            paths
+        });
+        let http = reqwest::Client::builder().no_proxy().build().unwrap();
+        let mut client = ApiClient::new(
+            http.clone(),
+            Arc::new(NetActivity::default()),
+            20,
+            20,
+            ApiSource::Shared,
+        );
+        client.base_url = Some(format!("http://{address}"));
+        client.set_token_provider(Some(TokenProvider::Web(WebTokens::new(
+            http,
+            crate::auth::StoredToken {
+                access_token: "test-only".into(),
+                expires_at: u64::MAX,
+                ..Default::default()
+            },
+            crate::credentials::Store::in_memory(crate::paths::AppDirs {
+                config: std::env::temp_dir().join("unused-discography-token/config"),
+                state: std::env::temp_dir().join("unused-discography-token/state"),
+                cache: std::env::temp_dir().join("unused-discography-token/cache"),
+            })
+            .lease(crate::credentials::Slot::Shared),
+            ApiSource::Shared,
+            Arc::new(|_| {}),
+        ))));
+        let albums = client.artist_discography("artist").await.unwrap();
+        assert_eq!(
+            albums.len(),
+            21,
+            "release IDs are deduplicated across pages"
+        );
+        assert_eq!(albums[0].popularity, Some(0));
+        assert_eq!(albums[19].popularity, Some(19));
+        assert_eq!(albums[20].popularity, Some(99));
+        assert_eq!(albums[0].album_group.as_deref(), Some("single"));
+        assert_eq!(albums[0].release_date.as_deref(), Some("2020"));
+        let paths = server.await.unwrap();
+        assert!(paths[0].starts_with("GET /artists/artist/albums?"));
+        assert!(paths[1].contains("offset=20"));
+        assert!(paths[2].starts_with("GET /albums?ids="));
+        assert_eq!(paths[3], "GET /albums?ids=a20 HTTP/1.1");
+    }
 
     #[tokio::test]
     async fn revoked_provider_cannot_return_or_persist_its_token() {

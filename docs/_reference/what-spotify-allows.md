@@ -26,7 +26,8 @@ Spotifast uses the Web API for:
   unfollowing. Custom playlist cover uploads are available since 0.9.0.
 - **Catalogue:** albums, artists, tracks, shows, episodes, search, and
   recommendations. Artist pages include top tracks, releases, and related
-  artists.
+  artists. Album popularity scores rank the artist page's five-release
+  preview; the complete discography is ordered by release date.
 - **Playback control:** listing devices, transferring playback, play, pause,
   next, previous, seek, shuffle, repeat, volume, and reading or adding to the
   queue.

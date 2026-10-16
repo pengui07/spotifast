@@ -91,6 +91,18 @@ pages through the existing Web API grant, one at a time, while loaded entries
 stay visible. A failed page stops automatic loading. Spotify custom playlist
 order uses the existing account-scoped rootlist from local playback; sorting
 and dragging never write that order back to Spotify.
+The combined Library also loads the remaining album and podcast pages when
+ranking recent plays or sorting by name, so items can rank across categories.
+This uses the same paginated requests and stops on a failed page.
+
+Opening an artist loads all pages of their albums, singles, and compilations,
+then reads album popularity through `/albums` in batches of up to twenty.
+These requests use the shared Web API grant because album batches are not
+available in Development Mode. The artist page shows five popular releases;
+Show more reuses the same data for a discography ordered by release date.
+The results stay in memory with the artist page. A failed request shows an
+error with a retry button. Appearances on other releases load separately
+when that filter is selected, using the existing paginated catalogue request.
 
 Since 0.9.0, a playlist-folder and invitation-permission read requested
 before local playback connects waits for that connection instead of being lost.

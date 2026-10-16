@@ -165,6 +165,20 @@ Library sidebar to start playing it. A single click still opens the row's page.
 Pointing at a row's cover art also shows a play button, but only when the
 sidebar is not in compact mode.
 
+## Artist discographies
+
+Artist headers show follower counts without genre tags.
+The **Shuffle** button beside Play toggles shuffle without starting playback.
+When enabled, it appears in the accent colour; press Play to start the artist
+with shuffle enabled.
+
+Artist pages show the five most popular releases in their Discography section,
+using Spotify's album popularity scores. **Show more** opens the complete
+discography, sorted by release date, newest first. Filter it to albums,
+singles and EPs, or appearances on other releases. Back returns to the artist
+overview. Duplicate release titles appear once; missing popularity scores
+rank below known scores, and missing release dates come last.
+
 ## Search results
 
 Spotify's search does not personalise its answers, so Spotifast adds your

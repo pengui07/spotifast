@@ -244,6 +244,10 @@ pub enum ApiRequest {
     ArtistTopTracks {
         id: String,
     },
+    ArtistDiscography {
+        id: String,
+        generation: u64,
+    },
     ArtistAlbums {
         id: String,
         groups: String,
@@ -474,6 +478,11 @@ pub enum ApiResponse {
     ArtistTopTracks {
         id: String,
         result: ApiResult<Vec<Track>>,
+    },
+    ArtistDiscography {
+        id: String,
+        generation: u64,
+        result: ApiResult<Vec<Album>>,
     },
     ArtistAlbums {
         id: String,
@@ -3515,6 +3524,7 @@ fn operation_for(api: &ApiGateway, request: &ApiRequest) -> Operation {
         }
         ApiRequest::Recommendations { .. }
         | ApiRequest::ArtistTopTracks { .. }
+        | ApiRequest::ArtistDiscography { .. }
         | ApiRequest::RelatedArtists { .. } => Operation::UnsupportedDevelopmentMode,
         ApiRequest::Artist { .. }
         | ApiRequest::ArtistAlbums { .. }
@@ -3861,6 +3871,11 @@ async fn handle(
         ApiRequest::ArtistTopTracks { id } => ApiResponse::ArtistTopTracks {
             result: routed!(artist_top_tracks(&id)),
             id,
+        },
+        ApiRequest::ArtistDiscography { id, generation } => ApiResponse::ArtistDiscography {
+            result: routed!(artist_discography(&id)),
+            id,
+            generation,
         },
         ApiRequest::ArtistAlbums { id, groups, offset } => ApiResponse::ArtistAlbums {
             result: routed!(artist_albums(&id, &groups, offset, 50)),

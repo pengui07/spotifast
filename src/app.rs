@@ -1754,9 +1754,14 @@ impl App {
             })
             .or_else(|| {
                 self.artist_pages.values().find_map(|page| {
-                    page.albums
-                        .values()
-                        .find_map(|albums| albums.items.iter().find(|album| album.id == id))
+                    page.discography
+                        .get()
+                        .and_then(|albums| albums.iter().find(|album| album.id == id))
+                        .or_else(|| {
+                            page.albums
+                                .values()
+                                .find_map(|albums| albums.items.iter().find(|album| album.id == id))
+                        })
                 })
             })
             .or_else(|| {
@@ -3833,14 +3838,25 @@ impl App {
                 }
                 self.request_contains(vec![format!("spotify:album:{id}")]);
             }
-            Page::Artist(id) => {
+            Page::Artist(id) | Page::Discography(id) => {
                 let page = self.artist_pages.entry(id.clone()).or_default();
                 if page.artist.needs_load() {
                     page.artist = Loadable::Loading;
                     self.backend.api(ApiRequest::Artist { id: id.clone() });
                 }
                 let filter = page.filter;
-                self.load_artist_albums(&id, filter);
+                if page.discography.needs_load() {
+                    self.load_generation = self.load_generation.wrapping_add(1);
+                    page.discography_generation = self.load_generation;
+                    page.discography = Loadable::Loading;
+                    self.backend.api(ApiRequest::ArtistDiscography {
+                        id: id.clone(),
+                        generation: page.discography_generation,
+                    });
+                }
+                if filter == DiscographyFilter::AppearsOn {
+                    self.load_artist_albums(&id, filter);
+                }
                 if page_related_needs_load(&self.artist_pages, &id) {
                     if let Some(page) = self.artist_pages.get_mut(&id) {
                         page.related = Loadable::Loading;
@@ -4300,7 +4316,7 @@ impl App {
             Page::Album(id) => {
                 self.album_pages.remove(id);
             }
-            Page::Artist(id) => {
+            Page::Artist(id) | Page::Discography(id) => {
                 self.artist_pages.remove(id);
             }
             Page::Show(id) => {
@@ -6199,6 +6215,25 @@ impl App {
                     page.top_tracks = Loadable::from_result(result);
                 }
             }
+            ApiResponse::ArtistDiscography {
+                id,
+                generation,
+                result,
+            } => {
+                if self
+                    .artist_pages
+                    .get(&id)
+                    .is_none_or(|page| page.discography_generation != generation)
+                {
+                    return;
+                }
+                if let Ok(albums) = &result {
+                    self.request_album_types(albums.iter());
+                }
+                if let Some(page) = self.artist_pages.get_mut(&id) {
+                    page.discography = Loadable::from_result(result);
+                }
+            }
             ApiResponse::ArtistAlbums {
                 id,
                 groups,
@@ -6609,7 +6644,7 @@ impl App {
             Page::Album(id) => {
                 protected_albums.insert(id.clone());
             }
-            Page::Artist(id) => {
+            Page::Artist(id) | Page::Discography(id) => {
                 protected_artists.insert(id.clone());
             }
             Page::Show(id) => {
@@ -6678,7 +6713,7 @@ impl App {
         self.page_used.retain(|page, _| match page {
             Page::Playlist(id) => self.playlist_pages.contains_key(id),
             Page::Album(id) => self.album_pages.contains_key(id),
-            Page::Artist(id) => self.artist_pages.contains_key(id),
+            Page::Artist(id) | Page::Discography(id) => self.artist_pages.contains_key(id),
             Page::Show(id) => self.show_pages.contains_key(id),
             Page::Radio(seed) => self.radio_pages.contains_key(seed),
             _ => true,
@@ -9204,7 +9239,9 @@ impl App {
                 if let Some(page) = self.artist_pages.get_mut(&artist_id) {
                     page.filter = filter;
                 }
-                self.load_artist_albums(&artist_id, filter);
+                if filter == DiscographyFilter::AppearsOn {
+                    self.load_artist_albums(&artist_id, filter);
+                }
             }
             Action::ToggleShowAllTop(id) => {
                 if let Some(page) = self.artist_pages.get_mut(&id) {
@@ -16240,6 +16277,47 @@ mod tests {
         assert_eq!(
             app.known_album("playlist-album").unwrap().id,
             "playlist-album"
+        );
+        app.backend.shutdown();
+    }
+
+    #[test]
+    fn discography_results_ignore_older_loads_and_keep_releases_available_for_navigation() {
+        let mut app = headless_app();
+        app.backend.set_offline(true);
+        app.artist_pages.insert(
+            "artist".into(),
+            ArtistPage {
+                discography: Loadable::Loading,
+                discography_generation: 2,
+                ..Default::default()
+            },
+        );
+        let album = Album {
+            id: "release".into(),
+            name: "Release".into(),
+            ..Default::default()
+        };
+        app.handle_api(ApiResponse::ArtistDiscography {
+            id: "artist".into(),
+            generation: 1,
+            result: Ok(vec![album.clone()]),
+        });
+        assert!(app.artist_pages["artist"].discography.get().is_none());
+        app.handle_api(ApiResponse::ArtistDiscography {
+            id: "artist".into(),
+            generation: 2,
+            result: Ok(vec![album]),
+        });
+        assert_eq!(app.known_album("release").unwrap().name, "Release");
+        app.handle_api(ApiResponse::ArtistDiscography {
+            id: "artist".into(),
+            generation: 1,
+            result: Err(crate::api::client::ApiError::NotSignedIn),
+        });
+        assert_eq!(
+            app.artist_pages["artist"].discography.get().unwrap().len(),
+            1
         );
         app.backend.shutdown();
     }
