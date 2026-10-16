@@ -66,7 +66,7 @@ in Windows.
 ### Arch Linux
 
 The AUR packages below install upstream Spotifast, not this fork. Use this
-fork's AppImage or Linux archive below for 0.1.0. To install upstream:
+fork's AppImage or Linux archive below for {{ v }}. To install upstream:
 
 ```sh
 yay -S spotifast-bin      # the released build, ready made
