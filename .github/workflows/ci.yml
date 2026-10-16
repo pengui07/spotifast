@@ -167,11 +167,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: wimpysworld/nothing-but-nix@v9
+        with:
+          # Cache archives are created on /, outside the expanded /nix volume.
+          root-safe-haven: '12288'
       - uses: cachix/install-nix-action@v31
       - uses: nix-community/cache-nix-action@v7
         with:
-          primary-key: nix-${{ runner.os }}-${{ hashFiles('**/flake.lock') }}
-          restore-prefixes-first-match: nix-${{ runner.os }}-
+          primary-key: nix-v2-${{ runner.os }}-${{ hashFiles('**/flake.lock') }}
+          restore-prefixes-first-match: nix-v2-${{ runner.os }}-
+          # Leave room to compress the cache without filling the runner disk.
+          gc-max-store-size-linux: '8G'
       - name: Read the public Nix cache
         if: vars.CACHIX_CACHE != ''
         uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
