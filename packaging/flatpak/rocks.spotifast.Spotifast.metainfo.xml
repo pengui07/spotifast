@@ -50,6 +50,12 @@
     <control>keyboard</control>
   </supports>
   <releases>
+    <release version="0.1.1" date="2026-10-15">
+      <url>https://github.com/pengui07/spotifast/releases/tag/v0.1.1</url>
+      <description>
+        <p>Albums and playlists share recent-play rankings, Home shortcuts keep complete rows, and artist pages preview popular releases with a complete discography and shuffle control.</p>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-10-15">
       <url>https://github.com/pengui07/spotifast/releases/tag/v0.1.0</url>
       <description>
