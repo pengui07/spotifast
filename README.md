@@ -38,6 +38,7 @@ The Now playing side panel can collapse to a slim restore tab. Right-panel
 views keep the same width when you switch between them.
 The Library shows playlists, albums, and podcasts together. Its category
 buttons toggle filters; click the selected category again to show everything.
+Recent plays rank albums alongside playlists, with pinned items kept at the top.
 Active Shuffle and Repeat controls show an accent dot underneath.
 Faithful UI offers an optional heart style for saved songs in Appearance settings.
 

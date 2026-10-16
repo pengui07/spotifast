@@ -351,6 +351,18 @@ pub(crate) fn selected_sort(app: &App, shelf: Filter) -> LibrarySort {
     }
 }
 
+/// The combined Library shares a ranking across categories. Playlist-only
+/// arrangements (including folders) belong to the Playlists filter.
+fn selected_view_sort(app: &App, filter: Option<Filter>) -> LibrarySort {
+    if let Some(shelf) = filter {
+        return selected_sort(app, shelf);
+    }
+    match selected_sort(app, Filter::Playlists) {
+        LibrarySort::Local | LibrarySort::Spotify => LibrarySort::RecentlyPlayed,
+        sort => sort,
+    }
+}
+
 /// Every sort the library offers, by name, in the order its menus list them.
 /// Settings offers the same choices, per shelf.
 pub(crate) fn sort_choices(locale: Locale) -> Vec<(LibrarySort, String)> {
@@ -958,7 +970,7 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
             }
         }
     });
-    let sort = selected_sort(app, filter.unwrap_or(Filter::Playlists));
+    let sort = selected_view_sort(app, filter);
     ui.data_mut(|data| {
         data.insert_temp(filter_id, filter);
         data.insert_temp(show_search_id, show_search);
@@ -982,7 +994,6 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
 
     // Load every visible category through its existing paginated requests.
     for shelf in visible_shelves(filter) {
-        let sort = selected_sort(app, shelf);
         match shelf {
             Filter::Playlists => {}
             Filter::Albums => {
@@ -1014,8 +1025,6 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
     let mut error: Option<String> = None;
     let mut more_pages = Vec::new();
     for shelf in visible_shelves(filter) {
-        let start = entries.len();
-        let sort = selected_sort(app, shelf);
         match shelf {
             Filter::Playlists => {
                 let liked = liked_entry(app);
@@ -1129,15 +1138,9 @@ fn contents(app: &mut App, ui: &mut egui::Ui, grid_art: Option<Rect>) {
                 }
             }
         }
-
-        order_entries(app, shelf, sort, &mut entries[start..]);
     }
+    order_entries(app, filter.unwrap_or(Filter::Playlists), sort, &mut entries);
     let pins = app.settings.library_pins();
-    entries.sort_by_key(|entry| {
-        pins.iter()
-            .position(|key| key == entry.ordering_key())
-            .unwrap_or(usize::MAX)
-    });
     let custom_order =
         filter.is_none_or(|shelf| shelf == Filter::Playlists) && sort == LibrarySort::Local;
     let pinned_rows = entries
@@ -2186,6 +2189,28 @@ mod ordering_tests {
         order_entries(&app, Filter::Playlists, LibrarySort::Name, &mut entries);
         assert_eq!(ids(&entries), ["a", "b", "c", "d"]);
         assert_eq!(ids(&rows(&app)), ["a", "b", "c", "d"]);
+        app.backend.shutdown();
+    }
+
+    #[test]
+    fn combined_library_uses_recent_plays_instead_of_playlist_only_arrangements() {
+        let mut app = app("combined-sort");
+        for sort in [LibrarySort::Local, LibrarySort::Spotify] {
+            app.settings.library_sort.insert(Filter::Playlists, sort);
+            assert_eq!(selected_view_sort(&app, None), LibrarySort::RecentlyPlayed);
+            assert_eq!(selected_view_sort(&app, Some(Filter::Playlists)), sort);
+        }
+        app.settings
+            .library_sort
+            .insert(Filter::Playlists, LibrarySort::Name);
+        assert_eq!(selected_view_sort(&app, None), LibrarySort::Name);
+        app.settings
+            .library_sort
+            .insert(Filter::Albums, LibrarySort::RecentlyAdded);
+        assert_eq!(
+            selected_view_sort(&app, Some(Filter::Albums)),
+            LibrarySort::RecentlyAdded
+        );
         app.backend.shutdown();
     }
 

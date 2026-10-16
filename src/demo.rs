@@ -1684,6 +1684,45 @@ mod tests {
         app.backend.shutdown();
     }
 
+    #[test]
+    fn combined_library_mixes_albums_and_playlists_and_updates_on_play() {
+        let (ctx, mut app) = accessible_app("library-mixed-recency");
+        app.backend.set_offline(true);
+        app.settings.sidebar_grid = false;
+        let album = app.library.albums.items[0].album.clone();
+        let playlists = app.library.playlists.get().unwrap();
+        let first = playlists[0].clone();
+        let second = playlists[1].clone();
+        app.settings.sidebar_order = vec![first.uri.clone(), second.uri.clone()];
+        let saved_order = app.settings.sidebar_order.clone();
+        app.settings.pinned_contexts = vec![first.uri.clone()];
+        app.settings.library_sort.clear();
+        app.recent_contexts = vec![second.uri.clone(), album.uri.clone()];
+        let view = crate::ui::sidebar::show;
+        view_frame(&ctx, &mut app, vec![], view);
+        let painted = view_frame(&ctx, &mut app, vec![], view);
+        let y =
+            |painted: &[(String, egui::Rect)], name: &str| sidebar_text(painted, name).center().y;
+        assert!(y(&painted, "Liked Songs") < y(&painted, &first.name));
+        assert!(y(&painted, &first.name) < y(&painted, &second.name));
+        assert!(y(&painted, &second.name) < y(&painted, &album.name));
+
+        app.apply(
+            Action::PlayContext {
+                uri: album.uri.clone(),
+                offset_uri: None,
+                offset_index: None,
+            },
+            &ctx,
+        );
+        let painted = view_frame(&ctx, &mut app, vec![], view);
+        assert_eq!(app.recent_contexts[0], album.uri);
+        assert!(y(&painted, &first.name) < y(&painted, &album.name));
+        assert!(y(&painted, &album.name) < y(&painted, &second.name));
+        assert_eq!(app.settings.sidebar_order, saved_order);
+        app.backend.shutdown();
+    }
+
     fn accessible_action(
         target: egui::accesskit::NodeId,
         action: egui::accesskit::Action,
@@ -2479,6 +2518,16 @@ mod tests {
         app.collapsed_folders = vec!["weekend".into()];
 
         let tree = accessible_frame(&ctx, &mut app, vec![]);
+        let playlists_filter = accessible_node(&tree, "Playlists", Role::Button);
+        let tree = accessible_frame(
+            &ctx,
+            &mut app,
+            vec![accessible_action(
+                playlists_filter,
+                egui::accesskit::Action::Click,
+                None,
+            )],
+        );
         accessible_node(&tree, "Focus, Ordner, ausgeklappt", Role::Button);
         accessible_node(&tree, "Weekend, Ordner, eingeklappt", Role::Button);
         app.backend.shutdown();
@@ -7037,6 +7086,14 @@ mod tests {
         let view = crate::ui::sidebar::show;
         view_frame(&ctx, &mut app, vec![], view);
         let painted = view_frame(&ctx, &mut app, vec![], view);
+        let playlists_filter = sidebar_text(&painted, "Playlists").center();
+        view_frame(
+            &ctx,
+            &mut app,
+            pointer_click(playlists_filter, egui::PointerButton::Primary),
+            view,
+        );
+        let painted = view_frame(&ctx, &mut app, vec![], view);
         let name = sidebar_text(&painted, "Focus").center();
         app.actions.clear();
         let [first, second] = double_click(name);
@@ -8219,6 +8276,17 @@ mod tests {
                 )
             };
             accessible_frame(&ctx, &mut app, vec![]);
+            let tree = accessible_frame(&ctx, &mut app, vec![]);
+            let playlists_filter = accessible_node(&tree, "Playlists", Role::Button);
+            accessible_frame(
+                &ctx,
+                &mut app,
+                vec![accessible_action(
+                    playlists_filter,
+                    egui::accesskit::Action::Click,
+                    None,
+                )],
+            );
             let tree = accessible_frame(&ctx, &mut app, vec![]);
             let source = row(&tree, "Liked Songs").center();
             let target = row(&tree, "Late night focus");

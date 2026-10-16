@@ -347,7 +347,11 @@ The Library starts with playlists, saved albums, and podcasts together. The
 Artists category has been removed. Choose **Playlists**, **Albums**, or
 **Podcasts** to filter the list; choose the same button again to return to
 everything. Search applies across the visible categories, and pins stay at
-the top. Each category keeps its existing order within the combined list.
+the top. The combined list ranks recent plays across categories, so playing
+an album moves it above older playlist plays immediately. Choosing **Name**
+for playlists sorts the combined list by name too. Playlist custom orders
+and folders apply in the **Playlists** filter; the combined list uses recent
+plays instead. Each category filter keeps its own sort preference.
 
 Since 0.8.0, Settings has a Library section that selects an order for each
 section. It is no longer a menu below the Library filters. **Name** and **Recently played** are available throughout.
@@ -368,7 +372,7 @@ pinned group. Selecting **Name**, **Recently played** or **Spotify custom order*
 keeps the saved arrangement, so selecting **Local custom order** restores it.
 The playlist context menu's **Sort by recently played** also preserves it.
 
-Upgrading keeps the previous default: a saved local playlist arrangement wins;
+In the **Playlists** filter, a saved local playlist arrangement wins;
 otherwise available Spotify folders keep their order, and a flat playlist list
 uses recent plays. Other sections keep their supplied Library order until you
 select a sort. Choosing a sort loads the rest of that Library section in the
